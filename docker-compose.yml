@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  user-service:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this-in-production
+      - JWT_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRATION_TIME=30m
+      - DATABASE_URL=postgresql://username:password@localhost:5432/database
+      - NODE_ENV=production
+    restart: unless-stopped

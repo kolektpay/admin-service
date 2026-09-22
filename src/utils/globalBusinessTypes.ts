@@ -1,0 +1,17 @@
+export const BUSINESS_TYPES = [
+  { name: "Sole Proprietorship" },
+  { name: "Partnership" },
+  { name: "Limited Liability Company (LLC)" },
+  { name: "Corporation (C Corp)" },
+  { name: "S Corporation (S Corp)" },
+  { name: "Nonprofit Organization" },
+  { name: "Cooperative" },
+  { name: "Franchise" },
+  { name: "Public Limited Company (PLC)" },
+  { name: "Private Limited Company (Ltd)" },
+  { name: "Startup" },
+  { name: "Holding Company" },
+  { name: "Joint Venture" },
+  { name: "Freelancer / Independent Contractor" },
+  { name: "Government-Owned Enterprise" },
+];

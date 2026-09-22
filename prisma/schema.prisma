@@ -1,0 +1,530 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model UserHasRole {
+  roleId     BigInt? @map("role_id")
+  userId     String  @map("user_id") @db.Uuid
+  businessId BigInt? @map("business_id")
+  id         BigInt  @id @default(autoincrement())
+  role       Role?   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_has_roles")
+}
+
+model Users {
+  email               String              @unique
+  firstName           String              @map("first_name")
+  lastName            String              @map("last_name")
+  password            String
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  emailVerifiedAt     DateTime?           @map("email_verified_at")
+  status              UserStatus          @default(inactive)
+  id                  String              @id @default(uuid()) @db.Uuid
+  phoneNumber         String?             @map("phone_number") @db.VarChar(15)
+  lastLoggedInAt      DateTime?           @map("last_logged_in_at")
+  mustChangePassword  Boolean?            @map("must_change_password")
+  passwordCreatedAt   DateTime?           @map("password_created_at")
+  passwordExpiresAt   DateTime?           @map("password_expires_at")
+  failedLoginCount    Int                 @default(0) @map("failed_login_count")
+  totpEnabled         Boolean             @default(false) @map("totp_enabled")
+  userSecret          String?             @map("user_secret")
+  totpTempExpiresAt   DateTime?           @map("totp_temp_expires_at")
+  totpTempSecret      String?             @map("totp_temp_secret")
+  totpSecret          String?             @map("totp_secret")
+  onBoardTracker      onBoardTrackerType  @default(unknown)
+  otpSecret           String?             @map("otp_secret")
+  otpExpiresAt        DateTime?           @map("otp_expires_at")
+  createdBy           String?             @map("created_by") @db.Uuid
+  blockReason         String?             @map("block_reason")
+  totpRequired        Boolean?            @default(true) @map("totp_required")
+  deletedAt           DateTime?           @map("deleted_at")
+  auditLogs           AuditLogs[]
+  passwordHistories   PasswordHistory[]
+  businesses          UserBusiness[]
+  userHasRoles        UserHasRole[]
+  passwordResetTokens UserPasswordReset[]
+  tokens              UserTokens[]
+
+  @@map("users")
+}
+
+model UserTokens {
+  id             BigInt     @id @default(autoincrement())
+  tokenId        String     @unique @map("token_id")
+  type           String
+  tokenExpiresAt DateTime   @map("token_expires_at")
+  revoked        Boolean    @default(false)
+  userId         String?    @map("user_id") @db.Uuid
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  studentId      BigInt?    @map("student_id")
+  guardianId     BigInt?    @map("guardian_id")
+  guardians      Guardians? @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  students       Students?  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  user           Users?     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("user_tokens")
+}
+
+model UserPasswordReset {
+  userId         String?    @map("user_id") @db.Uuid
+  token          String     @unique
+  isRevoked      Boolean    @default(true) @map("is_revoked")
+  tokenExpiresAt DateTime   @map("token_expires_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  id             BigInt     @id @default(autoincrement())
+  studentId      BigInt?    @map("student_id")
+  guardianId     BigInt?    @map("guardian_id")
+  guardian       Guardians? @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  students       Students?  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  user           Users?     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([token])
+  @@index([tokenExpiresAt])
+  @@map("user_password_reset")
+}
+
+model PasswordHistory {
+  id             BigInt     @id @default(autoincrement())
+  userId         String?    @map("user_id") @db.Uuid
+  password       String
+  passwordstatus String     @default("password change") @map("password_status")
+  created_at     DateTime   @default(now()) @map("created_at")
+  studentId      BigInt?    @map("student_id")
+  guardianId     BigInt?    @map("guardian_id")
+  guardians      Guardians? @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  students       Students?  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  user           Users?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_history")
+}
+
+model AuditLogs {
+  userId     String?          @map("user_id") @db.Uuid
+  ipAddress  String?          @map("ip_address") @db.VarChar(45)
+  result     AuditLoginResult
+  createdAt  DateTime         @default(now()) @map("created_at")
+  status     String?
+  id         BigInt           @id @default(autoincrement())
+  studentId  BigInt?          @map("student_id")
+  guardianId BigInt?          @map("guardian_id")
+  businessId BigInt?          @map("business_id")
+  businesses Businesses?      @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  guardians  Guardians?       @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  students   Students?        @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  user       Users?           @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([ipAddress])
+  @@map("auditlogs")
+}
+
+model Notifications {
+  subject            String
+  content            String
+  status             EmailStatus @default(PENDING)
+  retryCount         Int         @default(1) @map("retry_count")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  sentAt             DateTime?   @map("sent_at")
+  toRecipientAddress String      @map("to_recipient_address")
+  toRecipientName    String      @map("to_recipient_name")
+  type               String?
+  last_error_at      DateTime?
+  id                 BigInt      @id @default(autoincrement())
+
+  @@map("notifications")
+}
+
+model BusinessTypes {
+  id         BigInt       @id @default(autoincrement())
+  name       String
+  createdAt  DateTime?    @default(now()) @map("created_at")
+  updatedAt  DateTime?    @updatedAt @map("updated_at")
+  businesses Businesses[]
+
+  @@map("business_types")
+}
+
+model UserBusiness {
+  id         BigInt      @id @default(autoincrement())
+  userId     String      @map("user_id") @db.Uuid
+  businessId BigInt?     @map("business_id")
+  business   Businesses? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       Users       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_businesses")
+}
+
+model Businesses {
+  id                                       BigInt                                     @id @default(autoincrement())
+  name                                     String
+  rcNumber                                 String                                     @map("rc_number")
+  businessTypeId                           BigInt?                                    @map("business_type_id")
+  status                                   UserBusinessType                           @default(in_review)
+  phoneNumber                              String?                                    @map("phone_number") @db.VarChar(15)
+  address                                  String?
+  userEmail                                String?                                    @map("user_email")
+  businessEmail                            String?                                    @unique @map("business_email")
+  description                              String?
+  createdAt                                DateTime                                   @default(now()) @map("created_at")
+  updatedAt                                DateTime?                                  @updatedAt @map("updated_at")
+  deletedAt                                DateTime?                                  @map("deleted_at")
+  auditLogs                                AuditLogs[]
+  type                                     BusinessTypes?                             @relation(fields: [businessTypeId], references: [id], onDelete: Cascade)
+  paymentItems                             PaymentItems[]
+  students                                 Students[]
+  studentsAndGuardiansHavePermissionsTable StudentsAndGuardiansHavePermissionsTable[]
+  userBusinesses                           UserBusiness[]
+   invoices    Invoices[]
+
+  @@map("businesses")
+}
+
+model Permissions {
+  id                                       BigInt                                     @id @default(autoincrement())
+  name                                     String                                     @unique @db.VarChar(255)
+  createdAt                                DateTime?                                  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                                DateTime?                                  @updatedAt @map("updated_at") @db.Timestamp(0)
+  description                              String
+  isBlacklisted                            Boolean                                    @default(false) @map("is_blacklisted")
+  type                                     PermissionType                             @default(action)
+  category                                 PermissionsCategory?
+  roles                                    RoleHasPermission[]
+  studentsandguardianshavepermissionstable StudentsAndGuardiansHavePermissionsTable[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id           BigInt              @id @default(autoincrement())
+  name         String              @unique @db.VarChar(255)
+  createdAt    DateTime?           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime?           @updatedAt @map("updated_at") @db.Timestamp(0)
+  type         RoleType            @default(fixed)
+  permissions  RoleHasPermission[]
+  userHasRoles UserHasRole[]
+
+  @@map("roles")
+}
+
+model RoleHasPermission {
+  permissionId BigInt      @map("permission_id")
+  roleId       BigInt      @map("role_id")
+  permission   Permissions @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([permissionId, roleId])
+  @@map("role_has_permissions")
+}
+
+model Students {
+  id                                       BigInt                                     @id @default(autoincrement())
+  businessId                               BigInt                                     @map("business_id")
+  age                                      Int
+  gender                                   String
+  dateOfBirth                              DateTime                                   @map("date_of_birth")
+  firstName                                String                                     @map("first_name")
+  lastName                                 String                                     @map("last_name")
+  middleName                               String?                                    @map("middle_name")
+  registrationNumber                       String?                                    @unique @map("registration_number")
+  address                                  String                                     @map("address_of_student")
+  status                                   StudentStatus                              @default(active)
+  createdAt                                DateTime                                   @default(now()) @map("created_at")
+  updatedAt                                DateTime                                   @updatedAt @map("updated_at")
+  deletedAt                                DateTime?                                  @map("deleted_at")
+  isWalletCreated                          Boolean                                    @default(false) @map("is_wallet_created")
+  email                                    String                                     @unique @map("email")
+  phoneNumber                              String                                     @unique @map("phone_number")
+  subclassId                               BigInt                                     @map("subclass_id")
+  password                                 String                                     @map("password")
+  mustChangePassword                       Boolean?                                   @map("must_change_password")
+  failedLoginCount                         Int                                        @default(0) @map("failed_login_count")
+  lastLoggedInAt                           DateTime?                                  @map("last_logged_in_at")
+  blockReason                              String?                                    @map("block_reason")
+  passwordCreatedAt                        DateTime?                                  @map("password_created_at")
+  passwordExpiresAt                        DateTime?                                  @map("password_expires_at")
+  avatar                                   String?                                    @map("avatar")
+  AuditLogs                                AuditLogs[]
+  guardians                                GuardianHasStudents[]
+  invoices                                 Invoices[]
+  PasswordHistory                          PasswordHistory[]
+  business                                 Businesses                                 @relation(fields: [businessId], references: [id])
+  subclass                                 Subclasses                                 @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  studentsandguardianshavepermissionstable StudentsAndGuardiansHavePermissionsTable[]
+  UserPasswordReset                        UserPasswordReset[]
+  tokens                                   UserTokens[]
+
+  @@map("students")
+}
+
+model PaymentItems {
+  id            BigInt                @id @default(autoincrement())
+  name          String
+  status        PaymentItemStatus     @default(inactive)
+  amount        Decimal               @db.Decimal(15, 2)
+  startDate     DateTime              @map("start_date")
+  endDate       DateTime              @map("end_date")
+  createdBy     String                @map("created_by")
+  approvedBy    String?               @map("approved_by")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  approvedAt    DateTime?             @map("approved_at")
+  accountName   String?               @map("account_name")
+  accountNumber String?               @map("account_number") @db.VarChar(10)
+  classId       BigInt                @map("class_id")
+  description   String                @map("description")
+  businessId    BigInt?               @map("business_id")
+  paymentType   PaymentType[]         @default([]) @map("payment_type")
+  updatedAt     DateTime?             @map("updated_at")
+   updatedBy     String?                @map("updated_by")
+   bank           String?               @map("bank")
+  deletedAt     DateTime?             @map("deleted_at")
+  invoices      Invoices[]
+  subclasses    PaymentItemSubclass[]
+  businesses    Businesses?           @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  class         Classes               @relation(fields: [classId], references: [id])
+
+  @@map("payment_items")
+}
+
+model Guardians {
+  id                                       BigInt                                     @id @default(autoincrement())
+  email                                    String?                                    @unique @map("parents_or_guardians_email")
+  phoneNumber                              String                                     @unique @map("parents_or_guardians_phone_number") @db.VarChar(15)
+  password                                 String                                     @map("password")
+  firstName                                String                                     @map("parents_guardians_first_name")
+  lastName                                 String                                     @map("parents_guardians_last_name")
+  status                                   GuardianStatus                             @default(active)
+  blockReason                              String?                                    @map("block_reason")
+  createdAt                                DateTime                                   @default(now()) @map("created_at")
+  deletedAt                                DateTime?                                  @map("deleted_at")
+  failedLoginCount                         Int                                        @default(0) @map("failed_login_count")
+  lastLoggedInAt                           DateTime?                                  @map("last_logged_in_at")
+  passwordCreatedAt                        DateTime?                                  @map("password_created_at")
+  passwordExpiresAt                        DateTime?                                  @map("password_expires_at")
+  updatedAt                                DateTime?                                  @updatedAt @map("updated_at")
+  mustChangePassword                       Boolean?                                   @map("must_change_password")
+  businessId                               BigInt?                                    @map("business_id")
+  address                                  String?                                    @map("address_of_student")
+  auditlogs                                AuditLogs[]
+  students                                 GuardianHasStudents[]
+  invoices                                 Invoices[]
+  PasswordHistory                          PasswordHistory[]
+  studentsandguardianshavepermissionstable StudentsAndGuardiansHavePermissionsTable[]
+  userpasswordreset                        UserPasswordReset[]
+  usertokens                               UserTokens[]
+
+  @@map("guardians")
+}
+
+model GuardianHasStudents {
+  id         BigInt    @id @default(autoincrement())
+  studentId  BigInt    @map("student_id")
+  guardianId BigInt    @map("guardian_id")
+  guardians  Guardians @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  students   Students  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, guardianId])
+  @@map("guardian_has_students")
+}
+
+model StudentsAndGuardiansHavePermissionsTable {
+  id           BigInt      @id @default(autoincrement())
+  studentId    BigInt?     @map("student_id")
+  guardianId   BigInt?     @map("guardian_id")
+  permissionId BigInt      @map("permission_id")
+  businessId   BigInt?     @map("business_id")
+  businesses   Businesses? @relation(fields: [businessId], references: [id])
+  guardians    Guardians?  @relation(fields: [guardianId], references: [id])
+  permissions  Permissions @relation(fields: [permissionId], references: [id])
+  students     Students?   @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, guardianId, permissionId])
+  @@map("students_and_guardians_have_permissions_table")
+}
+
+model PaymentItemSubclass {
+  paymentItemId BigInt       @map("payment_item_id")
+  subclassId    BigInt       @map("subclass_id")
+  paymentItem   PaymentItems @relation(fields: [paymentItemId], references: [id], onDelete: Cascade)
+  subclass      Subclasses   @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+
+  @@id([paymentItemId, subclassId])
+  @@map("payment_item_subclasses")
+}
+
+model Subclasses {
+  id           BigInt                @id @default(autoincrement())
+  name         String
+  classId      BigInt                @map("class_id")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+  paymentItems PaymentItemSubclass[]
+  students     Students[]
+  class        Classes               @relation(fields: [classId], references: [id])
+
+  @@unique([classId, name])
+  @@map("subclasses")
+}
+
+model Classes {
+  id           BigInt         @id @default(autoincrement())
+  name         String
+  category     ClassCategory  @default(normal)
+  description  String
+  paymentItems PaymentItems[]
+  subclasses   Subclasses[]
+
+  @@map("classes")
+}
+
+model Invoices {
+  id                 BigInt        @id @default(autoincrement())
+  invoiceNumber      String        @unique @map("invoice_number") @db.VarChar(20)
+  paymentItemId      BigInt        @map("payment_item_id")
+  studentId          BigInt        @map("student_id")
+  businessId    BigInt?               @map("business_id")
+  guardianId         BigInt?       @map("guardian_id")
+  amount             Decimal       @db.Decimal(15, 2)
+  outstandingBalance Decimal       @default(0) @map("outstanding_balance") @db.Decimal(15, 2)
+  status             InvoiceStatus @default(pending)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime?      @updatedAt @map("updated_at")
+  deactivatedAt      DateTime?     @map("deactivated_at")
+  guardians          Guardians?    @relation(fields: [guardianId], references: [id])
+  paymentitems       PaymentItems  @relation(fields: [paymentItemId], references: [id])
+  students           Students      @relation(fields: [studentId], references: [id])
+    businesses           Businesses?     @relation(fields: [businessId], references: [id])
+
+    receipts    Receipts[]
+
+  @@index([studentId])
+  @@index([paymentItemId])
+  @@index([guardianId])
+  @@index([status])
+  @@index([deactivatedAt])
+  @@map("invoices")
+}
+
+
+
+model Receipts {
+  id                 BigInt   @id @default(autoincrement())
+  nameOfStudent      String   @map("name_of_student")
+    amount             Decimal       @db.Decimal(15, 2)
+  description        String   @map("description")
+  dateOfPayment      DateTime @map("date_of_payment")
+  outstandingBalance Decimal  @map("outstanding_balance") @db.Decimal(15, 2)
+  receiptNo          BigInt   @map("receipt_number")
+  invoiceId          BigInt   @map("invoice_id")
+  invoices           Invoices @relation(fields: [invoiceId], references: [id])
+
+  @@map("receipts")
+}
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+  suspended
+  pending
+  otp_verify
+}
+
+enum AuditLoginResult {
+  success
+  failure
+  blocked
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum PermissionType {
+  action
+  menu
+}
+
+enum RoleType {
+  fixed
+  custom
+}
+
+enum onBoardTrackerType {
+  step_1
+  step_2
+  unknown
+  step_3
+}
+
+enum UserBusinessType {
+  in_review
+  rejected
+  approved
+}
+
+enum PhoneNotificationChannel {
+  sms
+  whatsapp
+}
+
+enum StudentStatus {
+  active
+  inactive
+  suspended
+  graduated
+  withdrawn
+  blocked
+  pending
+}
+
+enum ClassCategory {
+  normal
+  ube
+}
+
+enum PermissionsCategory {
+  admin
+  student
+  guardian
+  kolektsuperadmin
+}
+
+enum PaymentItemStatus {
+  approved
+  inactive
+  rejected
+  cancelled
+  pending
+}
+
+enum GuardianStatus {
+  active
+  inactive
+  deceased
+  removed
+  blocked
+  pending
+}
+
+enum InvoiceStatus {
+  pending
+  paid
+  cancelled
+}
+
+enum PaymentType {
+  wallet
+  widget
+}
