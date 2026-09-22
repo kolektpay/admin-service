@@ -7,7 +7,7 @@ import {
   deleteStudentInfo,
   getAllStudentsAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
   updateStudentInfo,
-} from "../../services/student.service";
+} from "../../services/admin.student.service";
 import { IStudentFormData } from "../../interfaces/student.interfaces";
 import { PasswordHistoryModel } from "../../models/passwordHistory.model";
 import { IGuardianFormData } from "../../interfaces/guardian.interfaces";
@@ -16,14 +16,14 @@ import {
   deleteGuardianInfo,
   getAllGuardiansAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
   updateGuardianInfo,
-} from "../../services/guardian.service";
+} from "../../services/admin.guardian.service";
 import { generateNextInvoiceNumber } from "../../helpers/invoiceNumber.helper";
 // import { extractRequestMetadata } from "../utils/request.metadata";
 import { UserModel } from "../../models/user.model";
 import {
   createNewPaymentItemEntry,
   getAllPaymentItemsAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
-} from "../../services/paymentitem.service";
+} from "../../services/admin.aymentitem.service";
 import { CreatePaymentItemPayload } from "../../interfaces/paymentItem.interface";
 import { PaymentItemStatus } from "@prisma/client";
 import { NotificationModel } from "../../models/notifications.model";
@@ -40,7 +40,7 @@ import {
   blockUser,
   unblockUser,
   getAllUsersAndCheckIfSearchAndStatusCriteriaexist,
-} from "../../services/user.service";
+} from "../../services/admin.user.service";
 import dotenv from "dotenv";
 import prisma from "../../config/database";
 import { UserRoleModel } from "../../models/userHasRole.model";

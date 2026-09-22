@@ -4,8 +4,6 @@ import authRouter from "./auth/auth.routes";
 import walletRouter from "./admin/admin.wallet.routes";
 import transactionsRouter from "./admin/admin.transactions.routes";
 import adminRouter from "./admin/admin.routes";
-import studentRouter from "./student/student.routes";
-import guardianRouter from "../routes/guardian/guardian.routes";
 import adminStudentRouter from "./admin/admin.student.routes";
 import adminGuardianRouter from "./admin/admin.guardian.routes";
 
@@ -14,12 +12,11 @@ const router = Router();
 // API routes
 router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
-router.use("/students", studentRouter);
+
 router.use("/admin/students", adminStudentRouter);
 router.use("/admin/guardians", adminGuardianRouter);
 
 
-router.use("/guardians", guardianRouter);
 
 router.use("admin/wallet", walletRouter);
 router.use("admin/transactions", transactionsRouter);
