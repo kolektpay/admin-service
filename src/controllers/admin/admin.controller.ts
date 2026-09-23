@@ -1729,7 +1729,7 @@ export const deleteGuardianInfoHandler = async (
 
 /**
  * @swagger
- * /api/v1/admin/tudents:
+ * /api/v1/admin/students:
  *   get:
  *     summary: Get all students for a business
  *     description: |
