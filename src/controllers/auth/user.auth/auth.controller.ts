@@ -46,10 +46,10 @@ const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
 
 /**
  * @swagger
- * /api/v1/auth/admin/login:
+ * /api/v1/auth/login:
  *   post:
- *     summary: User login
- *     description: Authenticates a user using email, password and, when required, a 2FA code.
+ *     summary: Admin / Staff login
+ *     description: Authenticates an admin or staff user and returns authentication tokens and user permissions.
  *     tags:
  *       - Authentication
  *     requestBody:
@@ -65,28 +65,44 @@ const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
  *               email:
  *                 type: string
  *                 format: email
- *                 example: user@example.com
+ *                 example: admin@kolekt.com
  *               password:
  *                 type: string
  *                 format: password
  *                 example: Password123!
- *               code:
- *                 type: string
- *                 pattern: '^[0-9]{6}$'
- *                 example: "123456"
- *                 description: Required when 2FA verification is enabled.
  *     responses:
  *       200:
- *         description: Login successful or additional authentication step required.
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Login successful
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     accessToken:
+ *                       type: string
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                     refreshToken:
+ *                       type: string
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Invalid request data
  *       401:
- *         description: Invalid credentials or invalid 2FA token.
+ *         description: Invalid email or password
  *       403:
- *         description: Account blocked.
- *       404:
- *         description: User not found or no roles assigned.
+ *         description: Account is not authorized to log in
+ *       429:
+ *         description: Too many login attempts
  *       500:
- *         description: Internal server error.
- *     security: []
+ *         description: Internal server error
  */
 export const loginHandler = async (
   req: Request,
