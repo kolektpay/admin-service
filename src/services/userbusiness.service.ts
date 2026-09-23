@@ -2,7 +2,7 @@ import { onBoardTrackerType } from "@prisma/client";
 import prisma from "../config/database";
 import { ICreateBusinessDTO } from "../interfaces/business.interface";
 import { IServiceResponse } from "../interfaces/common.interface";
-import { getUserByEmail } from "./admin.user.service";
+import { getUserByEmail } from "./user.service";
 import { UserRoleModel } from "../models/userHasRole.model";
 import { createWallet } from "../thirdPartyService/wallet.services";
 import { AuditModel } from "../models/audit.model";

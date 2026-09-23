@@ -10,7 +10,7 @@ import adminGuardianRouter from "./admin/admin.guardian.routes";
 const router = Router();
 
 // API routes
-router.use("/auth", authRouter);
+router.use("/admin/auth", authRouter);
 router.use("/admin", adminRouter);
 
 router.use("/admin/students", adminStudentRouter);

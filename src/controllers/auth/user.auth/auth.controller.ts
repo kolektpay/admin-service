@@ -26,10 +26,10 @@ import { AuditModel } from "../../../models/audit.model";
 import { UserRoleModel } from "../../../models/userHasRole.model";
 import { RolePermissionModel } from "../../../models/permissions.model";
 import { ICreateUserDTO } from "../../../interfaces/user.interface";
-import { createUserBeforeOtpVerify } from "../../../services/admin.user.service";
+import { createUserBeforeOtpVerify } from "../../../services/user.service";
 import { IServiceResponse } from "../../../interfaces/common.interface";
 import { ICreateBusinessDTO } from "../../../interfaces/business.interface";
-import { createUserBusiness } from "../../../services/admin.userbusiness.service";
+import { createUserBusiness } from "../../../services/userbusiness.service";
 import { TempPasswordTokenManager } from "../../../utils/tempPasswordTokenManager";
 import OtpGenerator from "../../../utils/otpRegistrationManager";
 import dotenv from "dotenv";
@@ -46,7 +46,7 @@ const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
 
 /**
  * @swagger
- * /api/v1/auth/login:
+ * /api/v1/auth/admin/login:
  *   post:
  *     summary: User login
  *     description: Authenticates a user using email, password and, when required, a 2FA code.
@@ -474,7 +474,7 @@ export const loginHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/refresh:
+ * /api/v1/auth/admin/refresh:
  *   post:
  *     summary: Refresh access token
  *     description: Generates a new access and refresh token using a valid refresh token.
@@ -535,7 +535,7 @@ export const authenticateRefreshTokenHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/logout:
+ * /api/v1/auth/admin/logout:
  *   post:
  *     summary: Logout user
  *     description: Revokes all tokens belonging to the authenticated user.
@@ -574,7 +574,7 @@ export const logoutHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/setup/2fa:
+ * /api/v1/auth/admin/setup/2fa:
  *   post:
  *     summary: Setup 2FA
  *     description: Generates a temporary TOTP secret and QR code for the user.
@@ -638,7 +638,7 @@ export const setupTwoFactorHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/enable/2fa:
+ * /api/v1/auth/admin/enable/2fa:
  *   post:
  *     summary: Enable 2FA
  *     description: Verifies the TOTP code and permanently enables 2FA for the user.
@@ -729,7 +729,7 @@ export const enableTwoFactorHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/forgot-password:
+ * /api/v1/auth/admin/forgot-password:
  *   post:
  *     summary: Forgot password
  *     description: Generates a password reset token and sends reset instructions to the user's email.
@@ -803,7 +803,7 @@ export const forgotPasswordHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/reset-password:
+ * /api/v1/auth/admin/reset-password:
  *   post:
  *     summary: Reset password
  *     description: Resets a user's password using a valid password reset token.
@@ -932,7 +932,7 @@ export const resetPasswordHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/live-email-check:
+ * /api/v1/auth/admin/live-email-check:
  *   get:
  *     summary: Check email availability
  *     description: Checks whether an email address is already registered.
@@ -995,7 +995,7 @@ export const emailLiveCheckHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/register:
+ * /api/v1/auth/admin/register:
  *   post:
  *     summary: Register user
  *     description: |
@@ -1229,7 +1229,7 @@ export const registerUserWithKolektSuperAdminHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/must-change-password:
+ * /api/v1/auth/admin/must-change-password:
  *   post:
  *     summary: Change default password
  *     description: |
@@ -1342,7 +1342,7 @@ export const mustChangePasswordHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/verify-otp:
+ * /api/v1/auth/admin/verify-otp:
  *   post:
  *     summary: Verify registration OTP
  *     description: Verifies the OTP sent to the user's email during registration and updates the onboarding step to step_1.
@@ -1408,7 +1408,7 @@ export const otpVerifyHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/resend-otp:
+ * /api/v1/auth/admin/resend-otp:
  *   post:
  *     summary: Resend OTP
  *     description: Retrieves the OTP associated with the provided email address and returns it.
@@ -1463,7 +1463,7 @@ export const resendOtpHandler = async (
 
 /**
  * @swagger
- * /api/v1/business/types:
+ * /api/v1/admin/business/types:
  *   get:
  *     summary: Get business type list
  *     description: Returns a list of all available business types.

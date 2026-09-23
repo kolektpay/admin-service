@@ -23,7 +23,7 @@ import { UserModel } from "../../models/user.model";
 import {
   createNewPaymentItemEntry,
   getAllPaymentItemsAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
-} from "../../services/admin.aymentitem.service";
+} from "../../services/admin.paymentitem.service";
 import { CreatePaymentItemPayload } from "../../interfaces/paymentItem.interface";
 import { PaymentItemStatus } from "@prisma/client";
 import { NotificationModel } from "../../models/notifications.model";
@@ -40,7 +40,7 @@ import {
   blockUser,
   unblockUser,
   getAllUsersAndCheckIfSearchAndStatusCriteriaexist,
-} from "../../services/admin.user.service";
+} from "../../services/user.service";
 import dotenv from "dotenv";
 import prisma from "../../config/database";
 import { UserRoleModel } from "../../models/userHasRole.model";
