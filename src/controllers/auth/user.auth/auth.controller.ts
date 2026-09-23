@@ -46,7 +46,7 @@ const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
 
 /**
  * @swagger
- * /api/v1/auth/login:
+ * /api/v1/admin/auth/login:
  *   post:
  *     summary: Admin / Staff login
  *     description: Authenticates an admin or staff user and returns authentication tokens and user permissions.
@@ -490,7 +490,7 @@ export const loginHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/refresh:
+ * /api/v1/admin/auth/refresh:
  *   post:
  *     summary: Refresh access token
  *     description: Generates a new access and refresh token using a valid refresh token.
@@ -551,7 +551,7 @@ export const authenticateRefreshTokenHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/logout:
+ * /api/v1/admin/auth/logout:
  *   post:
  *     summary: Logout user
  *     description: Revokes all tokens belonging to the authenticated user.
@@ -590,7 +590,7 @@ export const logoutHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/setup/2fa:
+ * /api/v1/admin/auth/setup/2fa:
  *   post:
  *     summary: Setup 2FA
  *     description: Generates a temporary TOTP secret and QR code for the user.
@@ -654,7 +654,7 @@ export const setupTwoFactorHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/enable/2fa:
+ * /api/v1/admin/auth/enable/2fa:
  *   post:
  *     summary: Enable 2FA
  *     description: Verifies the TOTP code and permanently enables 2FA for the user.
@@ -745,7 +745,7 @@ export const enableTwoFactorHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/forgot-password:
+ * /api/v1/admin/auth/forgot-password:
  *   post:
  *     summary: Forgot password
  *     description: Generates a password reset token and sends reset instructions to the user's email.
@@ -819,7 +819,7 @@ export const forgotPasswordHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/reset-password:
+ * /api/v1/admin/auth/reset-password:
  *   post:
  *     summary: Reset password
  *     description: Resets a user's password using a valid password reset token.
@@ -948,7 +948,7 @@ export const resetPasswordHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/live-email-check:
+ * /api/v1/admin/auth/live-email-check:
  *   get:
  *     summary: Check email availability
  *     description: Checks whether an email address is already registered.
@@ -1011,7 +1011,7 @@ export const emailLiveCheckHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/register:
+ * /api/v1/admin/auth/register:
  *   post:
  *     summary: Register user
  *     description: |
@@ -1245,7 +1245,7 @@ export const registerUserWithKolektSuperAdminHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/must-change-password:
+ * /api/v1/admin/auth/must-change-password:
  *   post:
  *     summary: Change default password
  *     description: |
@@ -1358,7 +1358,7 @@ export const mustChangePasswordHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/verify-otp:
+ * /api/v1/admin/auth/verify-otp:
  *   post:
  *     summary: Verify registration OTP
  *     description: Verifies the OTP sent to the user's email during registration and updates the onboarding step to step_1.
@@ -1424,7 +1424,7 @@ export const otpVerifyHandler = async (
 
 /**
  * @swagger
- * /api/v1/auth/admin/resend-otp:
+ * /api/v1/admin/auth/resend-otp:
  *   post:
  *     summary: Resend OTP
  *     description: Retrieves the OTP associated with the provided email address and returns it.
@@ -1479,7 +1479,7 @@ export const resendOtpHandler = async (
 
 /**
  * @swagger
- * /api/v1/admin/business/types:
+ * /api/v1/admin/auth/business/types:
  *   get:
  *     summary: Get business type list
  *     description: Returns a list of all available business types.
