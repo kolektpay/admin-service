@@ -142,7 +142,7 @@ export const getEveryUserHandler = async (
   }
 
   if (page < 1) {
-    return errorResponse(res, "Page must be greater than 0", 400);
+    return errorResponse(res, "Page must be greater than 0.", 400);
   }
   if (limit < 1 || limit > 100) {
     return errorResponse(res, "Limit must be between 1 and 100", 400);
