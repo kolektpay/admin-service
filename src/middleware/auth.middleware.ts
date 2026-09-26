@@ -211,4 +211,62 @@ export const checkIfStaffHasStudentGuardianPermission = async (
   } catch (error) {
     console.log(error);
   }
+  
+};
+
+
+export const checkIfStaffHasPaymentItemApprovalPermission = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const userId = req.userId;
+
+  try {
+    if (!userId) {
+      return errorResponse(res, "unauthorised", 401);
+    }
+
+    let userRole = null;
+
+    try {
+      userRole = await prisma.userHasRole.findFirst({
+        where: {
+          userId: userId as string,
+        },
+        include: {
+          role: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return errorResponse(res, error.message, error.statusCode);
+      }
+    }
+
+    if (!userRole) {
+      return errorResponse(res, "unauthorised", 401);
+    }
+
+    const hasApprovalPermission = await prisma.roleHasPermission.findFirst({
+      where: {
+        roleId: userRole.roleId as bigint,
+        permission: {
+          name: "admin.payment_item.approve",
+        },
+      },
+    });
+
+    if (!hasApprovalPermission) {
+      return errorResponse(
+        res,
+        "unauthorised: missing payment item approval permission",
+        403,
+      );
+    }
+
+    next();
+  } catch (error) {
+    console.log(error);
+  }
 };

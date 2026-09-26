@@ -1,5 +1,5 @@
 {
-  "name": "user-service",
+  "name": "admin-service",
   "version": "1.0.0",
   "description": "Node.js Express API with Prisma ORM and PostgreSQL",
   "main": "dist/index.js",
@@ -27,6 +27,7 @@
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.3.0",
     "@types/node-telegram-bot-api": "^0.64.14",
+    "axios": "^1.20.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

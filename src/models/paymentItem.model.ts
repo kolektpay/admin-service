@@ -2,7 +2,6 @@ import { PaymentItemStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { getCurrentTimestamp } from "../helpers/date.helper";
 
-
 export class PaymentItemModel {
   static async updatePaymentItem(
     businessId: bigint,
@@ -52,6 +51,7 @@ export class PaymentItemModel {
   static async getPaymentItemName(
     paymentItemId: bigint,
   ): Promise<string | null> {
+    console.log("inside method", paymentItemId);
     const paymentItem = await prisma.paymentItems.findUnique({
       where: {
         id: paymentItemId,

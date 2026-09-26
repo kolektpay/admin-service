@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   authenticateJWT,
+  checkIfStaffHasPaymentItemApprovalPermission,
   requireManager,
 } from "../../middleware/auth.middleware";
 import {
@@ -9,8 +10,6 @@ import {
   validateUserQueryParams,
 } from "../../middleware/validation.middleware";
 import {
-  getAllPaymentItemsGeneratedAccordingToBusinessIdAndClassIdHandler,
-  createNewPaymentItemsAccordingToBusinessIdAndClassIdHandler,
   viewAuditLogsHandler,
   fetchRolesAndPermissionsHandler,
   getEveryUserHandler,
@@ -23,9 +22,13 @@ import {
   enforcePasswordRotationHandler,
   changeAnyUserPasswordHandler,
   getUserByIdHandler,
+} from "../../controllers/admin/admin.controller";
+import {
+  getAllPaymentItemsGeneratedAccordingToBusinessIdAndClassIdHandler,
+  createNewPaymentItemsAccordingToBusinessIdAndClassIdHandler,
   updatePaymentItemsAccordingToBusinessIdAndClassIdHandler,
   approvePaymentItemsAccordingToBusinessIdAndClassIdHandler,
-} from "../../controllers/admin/admin.controller";
+} from "../../controllers/paymentItem.controller";
 
 import { paymentItemGeneratorSchema } from "../../validations/paymentItemGenerator.schema";
 import {
@@ -70,6 +73,7 @@ router.patch(
 router.patch(
   "/payment-items/approve",
   authenticateJWT,
+  checkIfStaffHasPaymentItemApprovalPermission,
   approvePaymentItemsAccordingToBusinessIdAndClassIdHandler,
 );
 
