@@ -163,7 +163,7 @@ export const listStudentsQuerySchema = z
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   })
   .refine((q) => q.age === undefined || (q.minAge === undefined && q.maxAge === undefined), {
-    message: "Use either age or minAge/maxAge, not both",
+    message: "Use either age or minAge/maxAge, not both.",
     path: ["age"],
   })
   .refine((q) => !q.minAge || !q.maxAge || q.minAge <= q.maxAge, {
