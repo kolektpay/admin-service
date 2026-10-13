@@ -1,4 +1,4 @@
-import { EmailStatus } from "@prisma/client";
+import { EmailStatus, Prisma } from "@prisma/client";
 import prisma from "../config/database";
 import { EmailUser } from "../utils/emailTemplate";
 // import { Emails } from "../utils/emailTemplate";
@@ -29,7 +29,7 @@ interface OtpNotificationData {
   lastName: string;
 }
 
-interface MustChangePasswordNotificationData {
+export interface MustChangePasswordNotificationData {
   email: string;
   firstName: string;
   lastName: string;
@@ -142,22 +142,30 @@ export class NotificationModel {
     });
   }
 
+  /**
+   * Build the pending notification row for a new student's temporary password,
+   * so callers can insert it inside their own transaction.
+   */
+  static buildTempPasswordNotificationForStudents(
+    data: MustChangePasswordNotificationData,
+  ): Prisma.NotificationsCreateManyInput {
+    return {
+      subject:
+        "Temporary password generated after student creation that must be changed on login",
+      content: Object.values(data).join(","),
+      toRecipientAddress: data.email,
+      toRecipientName: `${data.firstName} ${data.lastName}`,
+      type: "change_password_email",
+
+      status: EmailStatus.PENDING,
+    };
+  }
+
   static async sendTempPasswordNotificationForStudents(
     data: MustChangePasswordNotificationData,
   ): Promise<void> {
-    const mustChangeTemporaryPasswordDataForStudents =
-      Object.values(data).join(",");
     await prisma.notifications.create({
-      data: {
-        subject:
-          "Temporary password generated after student creation that must be changed on login",
-        content: mustChangeTemporaryPasswordDataForStudents,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
-        type: "change_password_email",
-
-        status: EmailStatus.PENDING,
-      },
+      data: NotificationModel.buildTempPasswordNotificationForStudents(data),
     });
   }
 

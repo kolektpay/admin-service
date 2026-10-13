@@ -1,11 +1,11 @@
-# User Service - Node.js Express Prisma PostgreSQL
+# Admin Service - Node.js Express Prisma PostgreSQL
 
 A production-ready Node.js REST API built with Express, Prisma ORM, and PostgreSQL, featuring TypeScript and a well-organized folder structure.
 
 ## 📁 Project Structure
 
 ```
-user-service/
+admin-service/
 ├── prisma/
 │   └── schema.prisma          # Prisma schema and models
 ├── src/

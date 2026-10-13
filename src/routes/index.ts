@@ -18,8 +18,8 @@ router.use("/admin/guardians", adminGuardianRouter);
 
 
 
-router.use("admin/wallet", walletRouter);
-router.use("admin/transactions", transactionsRouter);
+router.use("/admin/wallet", walletRouter);
+router.use("/admin/transactions", transactionsRouter);
 
 // Health check
 router.get("/health", (req, res) => {

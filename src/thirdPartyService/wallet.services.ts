@@ -5,101 +5,111 @@ import {
 } from "../interfaces/wallet.interfaces";
 import { PaymentItemData } from "../interfaces/paymentitemwalletcreationdatainterface";
 import { CreatePaymentItemWalletResponse } from "../interfaces/paymentItem.interface";
+import { BaseProvider} from "../providers/base.provider";
+import { PaymentServiceEndpoints } from "../providers/paymentservice.endpoints";
 dotenv.config();
 
 const api_key = process.env.API_KEY;
-const create_wallet_url = process.env.CREATE_WALLET_API_URL;
-const create_student_wallet_url = process.env.CREATE_STUDENT_WALLET_API_URL;
-const get_wallet_details_url = process.env.GET_WALLET_DETAILS_API_URL;
-const generate_payment_link_url = process.env.GENERATE_PAYMENT_LINK_URL;
-const create_payment_item_wallet_url = process.env.CREATE_A_PAYMENT_ITEM_WALLET;
+const payment_service_base_url = process.env.PAYMENT_SERVICE_BASE_URL;
+
+class WalletProvider extends BaseProvider {
+  constructor() {
+    super("wallet", payment_service_base_url!, api_key!);
+  }
+
+  protected getAuthHeader(): string {
+    return this.apiKey;
+  }
+
+  protected getAccessToken(): string {
+    return this.apiKey;
+  }
+
+
+
+  createWallet(userId: string, businessId: number) {
+    return this.makeRequest(PaymentServiceEndpoints.CREATE_WALLET, { userId, businessId });
+  }
+
+  createStudentWallet(studentWalletCreationInfo: object) {
+    return this.makeRequest(PaymentServiceEndpoints.CREATE_STUDENT_WALLET, studentWalletCreationInfo);
+  }
+
+  getSpecificStudentWallet(studentId: bigint, businessId: bigint) {
+    return this.makeRequest(
+      `${PaymentServiceEndpoints.CREATE_STUDENT_WALLET}/${businessId}/${studentId}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  getWalletDetailsAfterLogin(businessId: number) {
+    return this.makeRequest(
+      `${PaymentServiceEndpoints.GET_WALLET_DETAILS}/${businessId}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  generatePaymentLink(paymentLinkData: GeneratePaymentLinkRequestBody) {
+    return this.makeRequest(PaymentServiceEndpoints.GENERATE_PAYMENT_LINK, paymentLinkData);
+  }
+
+  getAllPaymentLinksOfOneBusinessByBusinessId(
+    allPaymentLinksData: GetAllPaymentLinksParamsBody,
+  ) {
+    return this.makeRequest(
+      `${PaymentServiceEndpoints.GENERATE_PAYMENT_LINK}?businessId=${allPaymentLinksData.businessId}&page=${allPaymentLinksData.page}&limit=${allPaymentLinksData.limit}&startDate=${allPaymentLinksData.startDate}&endDate=${allPaymentLinksData.endDate}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  createPaymentItemWallet(
+    paymentItemWalletCreationInfo: PaymentItemData,
+  ): Promise<CreatePaymentItemWalletResponse> {
+    return this.makeRequest(
+      PaymentServiceEndpoints.CREATE_A_PAYMENT_ITEM_WALLET,
+      paymentItemWalletCreationInfo,
+    );
+  }
+}
+
+const walletProvider = new WalletProvider();
 
 export const createWallet = async (userId: string, businessId: number) => {
-  const response = await fetch(create_wallet_url!, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": api_key!,
-    },
-    body: JSON.stringify({ userId, businessId }),
-  });
-
-  return response.json();
+  return walletProvider.createWallet(userId, businessId);
 };
 
 export const createStudentWallet = async (
   studentWalletCreationInfo: object,
 ) => {
-  const response = await fetch(create_student_wallet_url!, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": api_key!,
-    },
-    body: JSON.stringify(studentWalletCreationInfo),
-  });
-
-  return response.json();
+  return walletProvider.createStudentWallet(studentWalletCreationInfo);
 };
 
 export const getSpecificStudentWallet = async (
   studentId: bigint,
   businessId: bigint,
 ) => {
-  const response = await fetch(
-    `${create_student_wallet_url!}/${businessId}/${studentId}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": api_key!,
-      },
-    },
-  );
-
-  return response.json();
+  return walletProvider.getSpecificStudentWallet(studentId, businessId);
 };
 
 export const getWalletDetailsAfterLogin = async (businessId: number) => {
-  const response = await fetch(`${get_wallet_details_url}/${businessId}`, {
-    method: "GET",
-    headers: {
-      "x-api-key": api_key!,
-    },
-  });
-
-  return response.json();
+  return walletProvider.getWalletDetailsAfterLogin(businessId);
 };
 
 export const generatePaymentLink = async (
   paymentLinkData: GeneratePaymentLinkRequestBody,
 ) => {
-  const response = await fetch(generate_payment_link_url!, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": api_key!,
-    },
-    body: JSON.stringify(paymentLinkData),
-  });
-
-  return response.json();
+  return walletProvider.generatePaymentLink(paymentLinkData);
 };
 
 export const getAllPaymentLinksOfOneBusinessByBusinessId = async (
   allPaymentLinksData: GetAllPaymentLinksParamsBody,
 ) => {
-  const response = await fetch(
-    `${generate_payment_link_url}?businessId=${allPaymentLinksData.businessId}&page=${allPaymentLinksData.page}&limit=${allPaymentLinksData.limit}&startDate=${allPaymentLinksData.startDate}&endDate=${allPaymentLinksData.endDate}`,
-    {
-      method: "GET",
-      headers: {
-        "x-api-key": api_key!,
-      },
-    },
+  return walletProvider.getAllPaymentLinksOfOneBusinessByBusinessId(
+    allPaymentLinksData,
   );
-
-  return response.json();
 };
 
 export const createPaymentItemWallet = async (
@@ -109,14 +119,5 @@ export const createPaymentItemWallet = async (
     "Payment Item Wallet Creation Info:",
     paymentItemWalletCreationInfo,
   );
-  const response = await fetch(create_payment_item_wallet_url!, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": api_key!,
-    },
-    body: JSON.stringify(paymentItemWalletCreationInfo),
-  });
-
-  return response.json() as Promise<CreatePaymentItemWalletResponse>;
+  return walletProvider.createPaymentItemWallet(paymentItemWalletCreationInfo);
 };

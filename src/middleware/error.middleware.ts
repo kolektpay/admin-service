@@ -1,14 +1,28 @@
 import { Request, Response, NextFunction } from "express";
 import { logExceptionToTelegram } from "../services/telegramLogger.service";
 
+export interface IFieldError {
+  field: string;
+  message: string;
+}
+
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
+  code?: string;
+  details?: IFieldError[];
 
-  constructor(message: string, statusCode: number) {
+  constructor(
+    message: string,
+    statusCode: number,
+    code?: string,
+    details?: IFieldError[],
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = true;
+    this.code = code;
+    this.details = details;
 
     Error.captureStackTrace(this, this.constructor);
   }
@@ -20,17 +34,26 @@ export const errorHandler = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
-  // Log exception to Telegram (non-blocking)
-  logExceptionToTelegram(err, req).catch((telegramError) => {
-    console.error("Failed to log to Telegram:", telegramError);
-  });
+  // Expected client errors (4xx AppErrors) are not exceptions worth alerting on
+  const isClientError = err instanceof AppError && err.statusCode < 500;
 
-  console.log(req);
+  if (!isClientError) {
+    // Log exception to Telegram (non-blocking)
+    logExceptionToTelegram(err, req).catch((telegramError) => {
+      console.error("Failed to log to Telegram:", telegramError);
+    });
+  }
+
   if (err instanceof AppError) {
+    if (!isClientError) {
+      console.error(`[${req.requestId}] ERROR:`, err.message);
+    }
     res.status(err.statusCode).json({
       success: false,
+      code: err.code,
       message: err.message,
-      error: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      details: err.details,
+      requestId: req.requestId,
     });
     return;
   }
@@ -46,11 +69,12 @@ export const errorHandler = async (
   }
 
   // Default error
-  console.error("ERROR:", err);
+  console.error(`[${req.requestId}] ERROR:`, err);
   res.status(500).json({
     success: false,
     message: "Internal server error",
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    requestId: req.requestId,
   });
 
   next(err);
