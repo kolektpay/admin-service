@@ -58,3 +58,31 @@ export const requestThrottle =
       next(err);
     }
   };
+
+/**
+ * Rate-limit authenticated requests per user for a named action.
+ * Must run after authenticateJWT.
+ */
+export const userActionThrottle =
+  (action: string, limit: number, windowSeconds: number) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ttl = await incrementAndCheck(
+        `throttle:${action}:${req.userId}`,
+        limit,
+        windowSeconds,
+      );
+
+      if (ttl !== null) {
+        return errorResponse(
+          res,
+          `Too many requests. Please try again in ${ttl} seconds`,
+          429,
+        );
+      }
+
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };

@@ -165,41 +165,42 @@ model UserBusiness {
 }
 
 model Businesses {
-  id                                       BigInt                                     @id @default(autoincrement())
-  name                                     String
-  rcNumber                                 String                                     @map("rc_number")
-  businessTypeId                           BigInt?                                    @map("business_type_id")
-  status                                   UserBusinessType                           @default(in_review)
-  phoneNumber                              String?                                    @map("phone_number") @db.VarChar(15)
-  address                                  String?
-  userEmail                                String?                                    @map("user_email")
-  businessEmail                            String?                                    @unique @map("business_email")
-  description                              String?
-  createdAt                                DateTime                                   @default(now()) @map("created_at")
-  updatedAt                                DateTime?                                  @updatedAt @map("updated_at")
-  deletedAt                                DateTime?                                  @map("deleted_at")
-  auditLogs                                AuditLogs[]
-  type                                     BusinessTypes?                             @relation(fields: [businessTypeId], references: [id], onDelete: Cascade)
-  paymentItems                             PaymentItems[]
-  students                                 Students[]
-  studentsAndGuardiansHavePermissionsTable StudentsAndGuardiansHavePermissionsTable[]
-  userBusinesses                           UserBusiness[]
-   invoices    Invoices[]
+  id                               BigInt                             @id @default(autoincrement())
+  name                             String
+  rcNumber                         String                             @map("rc_number")
+  businessTypeId                   BigInt?                            @map("business_type_id")
+  status                           UserBusinessType                   @default(in_review)
+  phoneNumber                      String?                            @map("phone_number") @db.VarChar(15)
+  address                          String?
+  userEmail                        String?                            @map("user_email")
+  businessEmail                    String?                            @unique @map("business_email")
+  description                      String?
+  createdAt                        DateTime                           @default(now()) @map("created_at")
+  updatedAt                        DateTime?                          @updatedAt @map("updated_at")
+  deletedAt                        DateTime?                          @map("deleted_at")
+  auditLogs                        AuditLogs[]
+  type                             BusinessTypes?                     @relation(fields: [businessTypeId], references: [id], onDelete: Cascade)
+  invoices                         Invoices[]
+  paymentItems                     PaymentItems[]
+  student_guardian_has_permissions student_guardian_has_permissions[]
+  students                         Students[]
+  students_has_wallets             students_has_wallets[]
+  userBusinesses                   UserBusiness[]
 
   @@map("businesses")
 }
 
 model Permissions {
-  id                                       BigInt                                     @id @default(autoincrement())
-  name                                     String                                     @unique @db.VarChar(255)
-  createdAt                                DateTime?                                  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                                DateTime?                                  @updatedAt @map("updated_at") @db.Timestamp(0)
-  description                              String
-  isBlacklisted                            Boolean                                    @default(false) @map("is_blacklisted")
-  type                                     PermissionType                             @default(action)
-  category                                 PermissionsCategory?
-  roles                                    RoleHasPermission[]
-  studentsandguardianshavepermissionstable StudentsAndGuardiansHavePermissionsTable[]
+  id                               BigInt                             @id @default(autoincrement())
+  name                             String                             @unique @db.VarChar(255)
+  createdAt                        DateTime?                          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                        DateTime?                          @updatedAt @map("updated_at") @db.Timestamp(0)
+  description                      String
+  isBlacklisted                    Boolean                            @default(false) @map("is_blacklisted")
+  type                             PermissionType                     @default(action)
+  category                         PermissionsCategory?
+  roles                            RoleHasPermission[]
+  student_guardian_has_permissions student_guardian_has_permissions[]
 
   @@map("permissions")
 }
@@ -227,41 +228,43 @@ model RoleHasPermission {
 }
 
 model Students {
-  id                                       BigInt                                     @id @default(autoincrement())
-  businessId                               BigInt                                     @map("business_id")
-  age                                      Int
-  gender                                   String
-  dateOfBirth                              DateTime                                   @map("date_of_birth")
-  firstName                                String                                     @map("first_name")
-  lastName                                 String                                     @map("last_name")
-  middleName                               String?                                    @map("middle_name")
-  registrationNumber                       String?                                    @unique @map("registration_number")
-  address                                  String                                     @map("address_of_student")
-  status                                   StudentStatus                              @default(active)
-  createdAt                                DateTime                                   @default(now()) @map("created_at")
-  updatedAt                                DateTime                                   @updatedAt @map("updated_at")
-  deletedAt                                DateTime?                                  @map("deleted_at")
-  isWalletCreated                          Boolean                                    @default(false) @map("is_wallet_created")
-  email                                    String                                     @unique @map("email")
-  phoneNumber                              String                                     @unique @map("phone_number")
-  subclassId                               BigInt                                     @map("subclass_id")
-  password                                 String                                     @map("password")
-  mustChangePassword                       Boolean?                                   @map("must_change_password")
-  failedLoginCount                         Int                                        @default(0) @map("failed_login_count")
-  lastLoggedInAt                           DateTime?                                  @map("last_logged_in_at")
-  blockReason                              String?                                    @map("block_reason")
-  passwordCreatedAt                        DateTime?                                  @map("password_created_at")
-  passwordExpiresAt                        DateTime?                                  @map("password_expires_at")
-  avatar                                   String?                                    @map("avatar")
-  AuditLogs                                AuditLogs[]
-  guardians                                GuardianHasStudents[]
-  invoices                                 Invoices[]
-  PasswordHistory                          PasswordHistory[]
-  business                                 Businesses                                 @relation(fields: [businessId], references: [id])
-  subclass                                 Subclasses                                 @relation(fields: [subclassId], references: [id], onDelete: Cascade)
-  studentsandguardianshavepermissionstable StudentsAndGuardiansHavePermissionsTable[]
-  UserPasswordReset                        UserPasswordReset[]
-  tokens                                   UserTokens[]
+  id                               BigInt                             @id @default(autoincrement())
+  businessId                       BigInt                             @map("business_id")
+  age                              Int
+  gender                           String
+  dateOfBirth                      DateTime                           @map("date_of_birth")
+  firstName                        String                             @map("first_name")
+  lastName                         String                             @map("last_name")
+  middleName                       String?                            @map("middle_name")
+  registrationNumber               String?                            @unique @map("registration_number")
+  address                          String                             @map("address_of_student")
+  status                           StudentStatus                      @default(active)
+  createdAt                        DateTime                           @default(now()) @map("created_at")
+  updatedAt                        DateTime                           @updatedAt @map("updated_at")
+  deletedAt                        DateTime?                          @map("deleted_at")
+  isWalletCreated                  Boolean                            @default(false) @map("is_wallet_created")
+  email                            String                             @unique @map("email")
+  phoneNumber                      String                             @unique @map("phone_number")
+  subclassId                       BigInt                             @map("subclass_id")
+  password                         String                             @map("password")
+  mustChangePassword               Boolean?                           @map("must_change_password")
+  failedLoginCount                 Int                                @default(0) @map("failed_login_count")
+  lastLoggedInAt                   DateTime?                          @map("last_logged_in_at")
+  blockReason                      String?                            @map("block_reason")
+  passwordCreatedAt                DateTime?                          @map("password_created_at")
+  passwordExpiresAt                DateTime?                          @map("password_expires_at")
+  avatar                           String?                            @map("avatar")
+  has_transaction_pin              String                             @default("no")
+  AuditLogs                        AuditLogs[]
+  guardians                        GuardianHasStudents[]
+  invoices                         Invoices[]
+  PasswordHistory                  PasswordHistory[]
+  student_guardian_has_permissions student_guardian_has_permissions[]
+  business                         Businesses                         @relation(fields: [businessId], references: [id])
+  subclass                         Subclasses                         @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  students_has_wallets             students_has_wallets[]
+  UserPasswordReset                UserPasswordReset[]
+  tokens                           UserTokens[]
 
   @@map("students")
 }
@@ -284,9 +287,10 @@ model PaymentItems {
   businessId    BigInt?               @map("business_id")
   paymentType   PaymentType[]         @default([]) @map("payment_type")
   updatedAt     DateTime?             @map("updated_at")
-   updatedBy     String?                @map("updated_by")
-   bank           String?               @map("bank")
   deletedAt     DateTime?             @map("deleted_at")
+  updatedBy     String?               @map("updated_by")
+  bank          String?               @map("bank")
+  wallet_id     String?               @db.Uuid
   invoices      Invoices[]
   subclasses    PaymentItemSubclass[]
   businesses    Businesses?           @relation(fields: [businessId], references: [id], onDelete: Restrict)
@@ -296,31 +300,31 @@ model PaymentItems {
 }
 
 model Guardians {
-  id                                       BigInt                                     @id @default(autoincrement())
-  email                                    String?                                    @unique @map("parents_or_guardians_email")
-  phoneNumber                              String                                     @unique @map("parents_or_guardians_phone_number") @db.VarChar(15)
-  password                                 String                                     @map("password")
-  firstName                                String                                     @map("parents_guardians_first_name")
-  lastName                                 String                                     @map("parents_guardians_last_name")
-  status                                   GuardianStatus                             @default(active)
-  blockReason                              String?                                    @map("block_reason")
-  createdAt                                DateTime                                   @default(now()) @map("created_at")
-  deletedAt                                DateTime?                                  @map("deleted_at")
-  failedLoginCount                         Int                                        @default(0) @map("failed_login_count")
-  lastLoggedInAt                           DateTime?                                  @map("last_logged_in_at")
-  passwordCreatedAt                        DateTime?                                  @map("password_created_at")
-  passwordExpiresAt                        DateTime?                                  @map("password_expires_at")
-  updatedAt                                DateTime?                                  @updatedAt @map("updated_at")
-  mustChangePassword                       Boolean?                                   @map("must_change_password")
-  businessId                               BigInt?                                    @map("business_id")
-  address                                  String?                                    @map("address_of_student")
-  auditlogs                                AuditLogs[]
-  students                                 GuardianHasStudents[]
-  invoices                                 Invoices[]
-  PasswordHistory                          PasswordHistory[]
-  studentsandguardianshavepermissionstable StudentsAndGuardiansHavePermissionsTable[]
-  userpasswordreset                        UserPasswordReset[]
-  usertokens                               UserTokens[]
+  id                               BigInt                             @id @default(autoincrement())
+  email                            String?                            @unique @map("parents_or_guardians_email")
+  phoneNumber                      String                             @unique @map("parents_or_guardians_phone_number") @db.VarChar(15)
+  password                         String                             @map("password")
+  firstName                        String                             @map("parents_guardians_first_name")
+  lastName                         String                             @map("parents_guardians_last_name")
+  status                           GuardianStatus                     @default(active)
+  blockReason                      String?                            @map("block_reason")
+  createdAt                        DateTime                           @default(now()) @map("created_at")
+  deletedAt                        DateTime?                          @map("deleted_at")
+  failedLoginCount                 Int                                @default(0) @map("failed_login_count")
+  lastLoggedInAt                   DateTime?                          @map("last_logged_in_at")
+  passwordCreatedAt                DateTime?                          @map("password_created_at")
+  passwordExpiresAt                DateTime?                          @map("password_expires_at")
+  updatedAt                        DateTime?                          @updatedAt @map("updated_at")
+  mustChangePassword               Boolean?                           @map("must_change_password")
+  businessId                       BigInt?                            @map("business_id")
+  address                          String?                            @map("address_of_student")
+  auditlogs                        AuditLogs[]
+  students                         GuardianHasStudents[]
+  invoices                         Invoices[]
+  PasswordHistory                  PasswordHistory[]
+  student_guardian_has_permissions student_guardian_has_permissions[]
+  userpasswordreset                UserPasswordReset[]
+  usertokens                       UserTokens[]
 
   @@map("guardians")
 }
@@ -334,21 +338,6 @@ model GuardianHasStudents {
 
   @@unique([studentId, guardianId])
   @@map("guardian_has_students")
-}
-
-model StudentsAndGuardiansHavePermissionsTable {
-  id           BigInt      @id @default(autoincrement())
-  studentId    BigInt?     @map("student_id")
-  guardianId   BigInt?     @map("guardian_id")
-  permissionId BigInt      @map("permission_id")
-  businessId   BigInt?     @map("business_id")
-  businesses   Businesses? @relation(fields: [businessId], references: [id])
-  guardians    Guardians?  @relation(fields: [guardianId], references: [id])
-  permissions  Permissions @relation(fields: [permissionId], references: [id])
-  students     Students?   @relation(fields: [studentId], references: [id])
-
-  @@unique([studentId, guardianId, permissionId])
-  @@map("students_and_guardians_have_permissions_table")
 }
 
 model PaymentItemSubclass {
@@ -391,21 +380,19 @@ model Invoices {
   invoiceNumber      String        @unique @map("invoice_number") @db.VarChar(20)
   paymentItemId      BigInt        @map("payment_item_id")
   studentId          BigInt        @map("student_id")
-  businessId    BigInt?               @map("business_id")
   guardianId         BigInt?       @map("guardian_id")
   amount             Decimal       @db.Decimal(15, 2)
   outstandingBalance Decimal       @default(0) @map("outstanding_balance") @db.Decimal(15, 2)
   status             InvoiceStatus @default(pending)
   createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime?      @updatedAt @map("updated_at")
+  updatedAt          DateTime?     @updatedAt @map("updated_at")
   deactivatedAt      DateTime?     @map("deactivated_at")
-  subClassId         BigInt?        @map("subclass_id")       
+  businessId         BigInt?       @map("business_id")
+  businesses         Businesses?   @relation(fields: [businessId], references: [id])
   guardians          Guardians?    @relation(fields: [guardianId], references: [id])
   paymentitems       PaymentItems  @relation(fields: [paymentItemId], references: [id])
   students           Students      @relation(fields: [studentId], references: [id])
-    businesses           Businesses?     @relation(fields: [businessId], references: [id])
-
-    receipts    Receipts[]
+  receipts           Receipts[]
 
   @@index([studentId])
   @@index([paymentItemId])
@@ -415,20 +402,47 @@ model Invoices {
   @@map("invoices")
 }
 
-
-
 model Receipts {
-  id                 BigInt   @id @default(autoincrement())
-  nameOfStudent      String   @map("name_of_student")
-    amount             Decimal       @db.Decimal(15, 2)
-  description        String   @map("description")
-  dateOfPayment      DateTime @map("date_of_payment")
-  outstandingBalance Decimal  @map("outstanding_balance") @db.Decimal(15, 2)
-  receiptNo          BigInt   @map("receipt_number")
-  invoiceId          BigInt   @map("invoice_id")
-  invoices           Invoices @relation(fields: [invoiceId], references: [id])
+  id                 BigInt        @id @default(autoincrement())
+  description        String        @map("description")
+  outstandingBalance Decimal       @map("outstanding_balance") @db.Decimal(15, 2)
+  invoiceId          BigInt        @map("invoice_id")
+  amount             Decimal       @db.Decimal(15, 2)
+  created_at         DateTime      @default(now())
+  payment_date       DateTime
+  receipt_no         String        @unique
+  receipt_status     ReceiptStatus @default(completed)
+  student_id         BigInt
+  student_name       String
+  updated_at         DateTime
+  invoices           Invoices      @relation(fields: [invoiceId], references: [id])
 
   @@map("receipts")
+}
+
+model student_guardian_has_permissions {
+  id            BigInt      @id @default(autoincrement())
+  student_id    BigInt?
+  guardian_id   BigInt?
+  permission_id BigInt
+  business_id   BigInt?
+  businesses    Businesses? @relation(fields: [business_id], references: [id])
+  guardians     Guardians?  @relation(fields: [guardian_id], references: [id])
+  permissions   Permissions @relation(fields: [permission_id], references: [id])
+  students      Students?   @relation(fields: [student_id], references: [id])
+
+  @@unique([student_id, guardian_id, permission_id])
+}
+
+model students_has_wallets {
+  id          BigInt     @id @default(autoincrement())
+  student_id  BigInt
+  business_id BigInt
+  wallet_id   String     @db.Uuid
+  businesses  Businesses @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  students    Students   @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, business_id])
 }
 
 enum UserStatus {
@@ -528,4 +542,9 @@ enum InvoiceStatus {
 enum PaymentType {
   wallet
   widget
+}
+
+enum ReceiptStatus {
+  completed
+  cancelled
 }

@@ -5,6 +5,8 @@ declare global {
     interface Request {
       /** The authenticated user's ID, populated by auth middleware */
       userId?: string | bigint;
+       /** Correlation id for this request, populated by the request logger */
+      requestId?: string;
        /** The authenticated user business ID*/
       businessId?: number | bigint;
       /** Custom session data object */

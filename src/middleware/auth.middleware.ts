@@ -24,6 +24,8 @@ export const authenticateJWT = async (
       if (error instanceof ApiError) {
         return errorResponse(res, error.message, error.statusCode);
       }
+      // Not an auth failure (e.g. database unreachable): let the error handler return a 500
+      return next(error);
     }
 
     if (!isTokenValid) {
@@ -54,7 +56,7 @@ export const authenticateJWT = async (
       next();
     }
   } catch (error) {
-    console.log(error);
+    next(error);
   }
 };
 
@@ -270,3 +272,41 @@ export const checkIfStaffHasPaymentItemApprovalPermission = async (
     console.log(error);
   }
 };
+
+/**
+ * Allows the request through only if the authenticated staff user's role
+ * has the given permission. Student and guardian tokens are always rejected.
+ */
+export const requirePermission =
+  (permissionName: string) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.userId) {
+        return errorResponse(res, "unauthorised", 401);
+      }
+
+      if (req.role === "student" || req.role === "guardian" || !req.businessId) {
+        return errorResponse(res, "unauthorised: staff only", 403);
+      }
+
+      const hasPermission = await prisma.roleHasPermission.findFirst({
+        where: {
+          permission: { name: permissionName },
+          role: { userHasRoles: { some: { userId: req.userId as string } } },
+        },
+        select: { roleId: true },
+      });
+
+      if (!hasPermission) {
+        return errorResponse(
+          res,
+          `unauthorised: missing ${permissionName} permission`,
+          403,
+        );
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };

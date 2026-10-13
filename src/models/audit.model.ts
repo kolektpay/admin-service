@@ -1,4 +1,7 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../config/database";
+
+type DbClient = Prisma.TransactionClient;
 
 export class AuditModel {
   /**
@@ -656,21 +659,6 @@ export class AuditModel {
     });
   }
 
-  static async logUserCreatedNewStudentEntry(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status:
-          "This user has successfully created a new student entry on the student table.",
-      },
-    });
-  }
-
   static async logUserCreatedNewGuardianEntry(
     userId: string,
     ipAddress?: string | undefined,
@@ -682,20 +670,6 @@ export class AuditModel {
         result: "success",
         status:
           "This user has successfully created a new student entry on the guardians table.",
-      },
-    });
-  }
-
-  static async logUpdatedStudentInfoForAParticlarBusinessId(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: `This user with id ${userId} updated student info`,
       },
     });
   }
@@ -715,20 +689,6 @@ export class AuditModel {
   }
 
   static async logDeletedGuardianInfoForAParticlarBusinessId(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: `This user with id ${userId} deleted guardian info`,
-      },
-    });
-  }
-
-  static async logDeletedStudentInfoForAParticlarBusinessId(
     userId: string,
     ipAddress?: string | undefined,
   ): Promise<void> {
@@ -842,6 +802,83 @@ export class AuditModel {
         businessId,
         result: "success",
         status: "payment_item_approval",
+      },
+    });
+  }
+
+  // ==========================================
+  // Student management (actor + target student recorded on each row).
+  // Accept a transaction client so the audit row commits atomically
+  // with the change it describes.
+  // ==========================================
+
+  static async logStudentsBulkCreated(
+    userId: string,
+    studentIds: bigint[],
+    ipAddress: string | undefined,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.createMany({
+      data: studentIds.map((studentId) => ({
+        userId,
+        studentId,
+        ipAddress,
+        result: "success" as const,
+        status: "student_created_via_bulk_upload",
+      })),
+    });
+  }
+
+  static async logStudentUpdated(
+    userId: string,
+    studentId: bigint,
+    updatedFields: string[],
+    ipAddress: string | undefined,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        userId,
+        studentId,
+        ipAddress,
+        result: "success",
+        status: `student_info_updated: ${updatedFields.join(", ")}`,
+      },
+    });
+  }
+
+  static async logStudentDeleted(
+    userId: string,
+    studentId: bigint,
+    ipAddress: string | undefined,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        userId,
+        studentId,
+        ipAddress,
+        result: "success",
+        status: "student_deleted",
+      },
+    });
+  }
+
+  static async logStudentStatusChanged(
+    userId: string,
+    studentId: bigint,
+    action: "blocked" | "unblocked",
+    reason: string | undefined,
+    ipAddress: string | undefined,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        userId,
+        studentId,
+        ipAddress,
+        result: action === "blocked" ? "blocked" : "success",
+        status: `student_account_${action}${reason ? ` due to ${reason}` : ""}`,
       },
     });
   }
