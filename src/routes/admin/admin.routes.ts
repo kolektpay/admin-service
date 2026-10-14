@@ -22,7 +22,7 @@ import {
   enforcePasswordRotationHandler,
   changeAnyUserPasswordHandler,
   getUserByIdHandler,
-} from "../../controllers/admin/admin.controller";
+} from "../../controllers/guardian/guardian.controller";
 import {
   getAllPaymentItemsGeneratedAccordingToBusinessIdAndClassIdHandler,
   createNewPaymentItemsAccordingToBusinessIdAndClassIdHandler,

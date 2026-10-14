@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { authenticateJWT, checkIfStaffHasStudentGuardianPermission } from "../../middleware/auth.middleware";
+import {
+  authenticateJWT,
+  checkIfStaffHasStudentGuardianPermission,
+} from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validation.middleware";
 import { createGuardianSchema } from "../../validations/guardianCreationInfoValidation.schema";
 import {
@@ -7,8 +10,7 @@ import {
   deleteGuardianInfoHandler,
   getAllGuardianInfoAccordingToBusinessIdHandler,
   updateGuardianInfoHandler,
-} from "../../controllers/admin/admin.controller";
-
+} from "../../controllers/guardian/guardian.controller";
 
 const router = Router();
 
@@ -40,6 +42,5 @@ router.delete(
   checkIfStaffHasStudentGuardianPermission,
   deleteGuardianInfoHandler,
 );
-
 
 export default router;

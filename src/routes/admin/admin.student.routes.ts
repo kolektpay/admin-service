@@ -6,7 +6,7 @@ import {
   listStudentsHandler,
   unblockStudentHandler,
   updateStudentHandler,
-} from "../../controllers/admin/admin.student.controller";
+} from "../../controllers/student/student.controller";
 import {
   blockStudentSchema,
   bulkCreateStudentsSchema,
@@ -17,17 +17,28 @@ import {
   updateStudentSchema,
 } from "../../validations/studentManagement.schema";
 import { Router } from "express";
-import { authenticateJWT, requirePermission } from "../../middleware/auth.middleware";
+import {
+  authenticateJWT,
+  requirePermission,
+} from "../../middleware/auth.middleware";
 import { validateRequest } from "../../middleware/validation.middleware";
 import { userActionThrottle } from "../../middleware/reqThrottle.middleware";
 import { asyncHandler } from "../../utils/asyncHandler";
 
 const router = Router();
 
-const canReadStudents = requirePermission("admin.student_management.read_student");
-const canCreateStudents = requirePermission("admin.student_management.create_student");
-const canUpdateStudents = requirePermission("admin.student_management.update_student");
-const canDeleteStudents = requirePermission("admin.student_management.delete_student");
+const canReadStudents = requirePermission(
+  "admin.student_management.read_student",
+);
+const canCreateStudents = requirePermission(
+  "admin.student_management.create_student",
+);
+const canUpdateStudents = requirePermission(
+  "admin.student_management.update_student",
+);
+const canDeleteStudents = requirePermission(
+  "admin.student_management.delete_student",
+);
 
 // ==========================================
 // Student Management Routes

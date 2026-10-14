@@ -31,7 +31,7 @@ const studentField = (index: number, field: string) => `students[${index}].${fie
 
 /** Reject the batch if two records share an email, phone number or registration number. */
 const assertNoDuplicatesWithinBatch = (records: BulkStudentRecord[]): void => {
-  const fields = ["email", "phoneNumber", "registrationNumber"] as const;
+  const fields = ["email",  "registrationNumber"] as const;
   const details: IFieldError[] = [];
 
   for (const field of fields) {
@@ -62,33 +62,39 @@ const assertNoDuplicatesWithinBatch = (records: BulkStudentRecord[]): void => {
   }
 };
 
-/** Every guardian must belong to the caller's business, not be deleted, and be assignable. */
-const assertGuardiansAreAssignable = async (
+/**
+ * Look up each record's guardian by email. Every guardian must belong to the
+ * caller's business, not be deleted, and be assignable. Returns the guardian
+ * id for each record, in the same order as `records`.
+ */
+const resolveGuardianIds = async (
   records: BulkStudentRecord[],
   businessId: bigint,
-): Promise<void> => {
-  const guardianIds = [...new Set(records.map((r) => r.guardianId))];
+): Promise<bigint[]> => {
+  // Guardian emails are not normalised on creation, so match case-insensitively
+  const guardianEmails = [...new Set(records.map((r) => r.guardianEmail))];
   const eligible = await prisma.guardians.findMany({
     where: {
-      id: { in: guardianIds },
+      OR: guardianEmails.map((email) => ({ email: { equals: email, mode: "insensitive" as const } })),
       businessId,
       deletedAt: null,
       status: { in: ASSIGNABLE_GUARDIAN_STATUSES },
     },
-    select: { id: true },
+    select: { id: true, email: true },
   });
-  const eligibleIds = new Set(eligible.map((g) => g.id));
+  const guardianIdByEmail = new Map(eligible.map((g) => [g.email!.toLowerCase(), g.id]));
 
-  const details = records.flatMap((record, index) =>
-    eligibleIds.has(record.guardianId)
-      ? []
-      : [
-          {
-            field: studentField(index, "guardianId"),
-            message: "Guardian not found or not eligible for assignment",
-          },
-        ],
-  );
+  const details: IFieldError[] = [];
+  const guardianIds = records.map((record, index) => {
+    const guardianId = guardianIdByEmail.get(record.guardianEmail);
+    if (guardianId === undefined) {
+      details.push({
+        field: studentField(index, "guardianEmail"),
+        message: "Guardian not found or not eligible for assignment",
+      });
+    }
+    return guardianId!;
+  });
 
   if (details.length) {
     throw new AppError(
@@ -98,18 +104,21 @@ const assertGuardiansAreAssignable = async (
       details,
     );
   }
+
+  return guardianIds;
 };
 
+/** Validates the batch and returns the resolved guardian id for each record. */
 const validateBatch = async (
   records: BulkStudentRecord[],
   businessId: bigint,
-): Promise<void> => {
+): Promise<bigint[]> => {
   assertNoDuplicatesWithinBatch(records);
 
   const conflicts = await findStudentUniquenessConflicts(records, studentField);
   if (conflicts.length) throw studentConflictError(conflicts);
 
-  await assertGuardiansAreAssignable(records, businessId);
+  const guardianIds = await resolveGuardianIds(records, businessId);
   await assertSubclassesExist(
     records.map((r) => r.subclassId),
     (subclassId) =>
@@ -117,6 +126,8 @@ const validateBatch = async (
         r.subclassId === subclassId ? [studentField(index, "subclassId")] : [],
       ),
   );
+
+  return guardianIds;
 };
 
 // ==========================================
@@ -125,17 +136,21 @@ const validateBatch = async (
 
 interface PreparedStudent {
   record: BulkStudentRecord;
+  guardianId: bigint;
   temporaryPassword: string;
   hashedPassword: string;
 }
 
 /** Password hashing is slow, so it happens before the transaction opens. */
-const prepareStudents = (records: BulkStudentRecord[]): Promise<PreparedStudent[]> =>
+const prepareStudents = (
+  records: BulkStudentRecord[],
+  guardianIds: bigint[],
+): Promise<PreparedStudent[]> =>
   Promise.all(
-    records.map(async (record) => {
+    records.map(async (record, index) => {
       const temporaryPassword = TempPasswordTokenManager.generateToken();
       const hashedPassword = await bcrypt.hash(temporaryPassword, saltRounds);
-      return { record, temporaryPassword, hashedPassword };
+      return { record, guardianId: guardianIds[index], temporaryPassword, hashedPassword };
     }),
   );
 
@@ -189,9 +204,9 @@ const insertStudentsAtomically = (
       const idFor = (record: BulkStudentRecord) => studentIdByEmail.get(record.email)!;
 
       await tx.guardianHasStudents.createMany({
-        data: prepared.map(({ record }) => ({
+        data: prepared.map(({ record, guardianId }) => ({
           studentId: idFor(record),
-          guardianId: record.guardianId,
+          guardianId,
         })),
       });
 
@@ -254,8 +269,10 @@ const runWithConcurrency = async <T>(
 
 /**
  * Wallets live in the external payment service, so they cannot join the
- * database transaction. They are requested only after the students are
- * committed; each student's `isWalletCreated` flag records the outcome.
+ * database transaction and a wallet failure does not roll the students back.
+ * Wallets are requested only after the students are committed. Each wallet
+ * that is created is recorded in `students_has_wallets` and flips the
+ * student's `isWalletCreated` flag; both writes share one transaction.
  * Students left with `isWalletCreated = false` are reported as pending and
  * can be retried through POST /admin/wallet/student-wallets.
  */
@@ -264,7 +281,7 @@ const provisionStudentWallets = async (
   recordByEmail: Map<string, BulkStudentRecord>,
   businessId: bigint,
 ): Promise<WalletProvisioningResult> => {
-  const createdIds: bigint[] = [];
+  const created: { studentId: bigint; walletId: string }[] = [];
   const pending: WalletProvisioningResult["pending"] = [];
 
   await runWithConcurrency(students, WALLET_REQUEST_CONCURRENCY, async (student) => {
@@ -286,24 +303,37 @@ const provisionStudentWallets = async (
       });
 
       // The wallet provider resolves with { success: false } instead of throwing
+      const walletId: string | undefined = response?.data?.walletId;
       if (response?.success === false) {
         pending.push({ studentId: student.id, reason: "Wallet service rejected the request" });
+      } else if (!walletId) {
+        pending.push({ studentId: student.id, reason: "Wallet service returned no wallet id" });
       } else {
-        createdIds.push(student.id);
+        created.push({ studentId: student.id, walletId });
       }
     } catch {
       pending.push({ studentId: student.id, reason: "Wallet service unavailable" });
     }
   });
 
-  if (createdIds.length) {
-    await prisma.students.updateMany({
-      where: { id: { in: createdIds } },
-      data: { isWalletCreated: true },
-    });
+  if (created.length) {
+    await prisma.$transaction([
+      prisma.studentsHasWallets.createMany({
+        data: created.map(({ studentId, walletId }) => ({
+          student_id: studentId,
+          business_id: businessId,
+          wallet_id: walletId,
+        })),
+        skipDuplicates: true,
+      }),
+      prisma.students.updateMany({
+        where: { id: { in: created.map((c) => c.studentId) } },
+        data: { isWalletCreated: true },
+      }),
+    ]);
   }
 
-  return { created: createdIds.length, pending };
+  return { created: created.length, pending };
 };
 
 // ==========================================
@@ -319,9 +349,9 @@ export const bulkCreateStudents = async (
   businessId: bigint,
   actor: StudentActor,
 ): Promise<{ students: CreatedStudent[]; walletProvisioning: WalletProvisioningResult }> => {
-  await validateBatch(records, businessId);
+  const guardianIds = await validateBatch(records, businessId);
 
-  const prepared = await prepareStudents(records);
+  const prepared = await prepareStudents(records, guardianIds);
 
   let students: CreatedStudent[];
   try {

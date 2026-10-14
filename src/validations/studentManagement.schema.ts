@@ -70,7 +70,7 @@ export const bulkStudentRecordSchema = z.strictObject({
   middleName: editableStudentFields.middleName.optional(),
   registrationNumber: editableStudentFields.registrationNumber.optional(),
   avatar: editableStudentFields.avatar.optional(),
-  guardianId: idSchema,
+  guardianEmail: emailSchema,
   // Wallet provisioning details (sent to the payment service, not stored)
   city: z.string().trim().min(1).max(100),
   alias: z.string().trim().min(1).max(100).optional(),

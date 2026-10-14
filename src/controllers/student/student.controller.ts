@@ -21,7 +21,8 @@ const getActor = (req: Request): StudentActor => ({
   ip: extractRequestMetadata(req).ip,
 });
 
-const getStudentId = (req: Request): bigint => req.params.studentId as unknown as bigint;
+const getStudentId = (req: Request): bigint =>
+  req.params.studentId as unknown as bigint;
 
 /**
  * @swagger
@@ -64,7 +65,10 @@ const getStudentId = (req: Request): bigint => req.params.studentId as unknown a
  *       403:
  *         description: Missing permission
  */
-export const listStudentsHandler = async (req: Request, res: Response): Promise<void> => {
+export const listStudentsHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const result = await listStudents(
     getBusinessId(req),
     req.query as unknown as ListStudentsQuery,
@@ -91,7 +95,7 @@ export const listStudentsHandler = async (req: Request, res: Response): Promise<
  *         application/json:
  *           schema:
  *             type: object
- *             required: [firstName, lastName, email, phoneNumber, gender, dateOfBirth, age, address, subclassId, guardianId, city]
+ *             required: [firstName, lastName, email, phoneNumber, gender, dateOfBirth, age, address, subclassId, guardianEmail, city]
  *             properties:
  *               firstName: { type: string, example: Ngozi }
  *               middleName: { type: string, nullable: true }
@@ -102,10 +106,10 @@ export const listStudentsHandler = async (req: Request, res: Response): Promise<
  *               gender: { type: string, example: Female }
  *               dateOfBirth: { type: string, format: date, example: "2013-09-14" }
  *               age: { type: integer, example: 13 }
- *               address: { type: string, example: Ikeja, Lagos }
+ *               address: { type: string, example: "Ikeja, Lagos" }
  *               avatar: { type: string, format: uri, nullable: true }
  *               subclassId: { type: integer, example: 3 }
- *               guardianId: { type: integer, example: 12 }
+ *               guardianEmail: { type: string, format: email, description: Email of an existing guardian in your business, example: chidi.adetunji@example.com }
  *               city: { type: string, description: Used for wallet creation only, example: Lagos }
  *               alias: { type: string, description: Optional wallet alias }
  *     responses:
@@ -120,7 +124,10 @@ export const listStudentsHandler = async (req: Request, res: Response): Promise<
  *       403:
  *         description: Missing permission
  */
-export const createStudentHandler = async (req: Request, res: Response): Promise<void> => {
+export const createStudentHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const { students, walletProvisioning } = await bulkCreateStudents(
     [req.body],
     getBusinessId(req),
@@ -132,7 +139,12 @@ export const createStudentHandler = async (req: Request, res: Response): Promise
       ? "Student created successfully"
       : "Student created; wallet is pending and can be retried";
 
-  successResponse(res, message, { student: students[0], walletProvisioning }, 201);
+  successResponse(
+    res,
+    message,
+    { student: students[0], walletProvisioning },
+    201,
+  );
 };
 
 /**
@@ -166,7 +178,7 @@ export const createStudentHandler = async (req: Request, res: Response): Promise
  *                 maxItems: 100
  *                 items:
  *                   type: object
- *                   required: [firstName, lastName, email, phoneNumber, gender, dateOfBirth, age, address, subclassId, guardianId, city]
+ *                   required: [firstName, lastName, email, phoneNumber, gender, dateOfBirth, age, address, subclassId, guardianEmail, city]
  *                   properties:
  *                     firstName: { type: string, example: Ngozi }
  *                     middleName: { type: string, nullable: true }
@@ -177,10 +189,10 @@ export const createStudentHandler = async (req: Request, res: Response): Promise
  *                     gender: { type: string, example: Female }
  *                     dateOfBirth: { type: string, format: date, example: "2013-09-14" }
  *                     age: { type: integer, example: 13 }
- *                     address: { type: string, example: Ikeja, Lagos }
+ *                     address: { type: string, example: "Ikeja, Lagos" }
  *                     avatar: { type: string, format: uri, nullable: true }
  *                     subclassId: { type: integer, example: 3 }
- *                     guardianId: { type: integer, example: 12 }
+ *                     guardianEmail: { type: string, format: email, description: Email of an existing guardian in your business, example: chidi.adetunji@example.com }
  *                     city: { type: string, description: Used for wallet creation only, example: Lagos }
  *                     alias: { type: string, description: Optional wallet alias }
  *     responses:
@@ -197,7 +209,10 @@ export const createStudentHandler = async (req: Request, res: Response): Promise
  *       429:
  *         description: Too many bulk requests
  */
-export const bulkCreateStudentsHandler = async (req: Request, res: Response): Promise<void> => {
+export const bulkCreateStudentsHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const { students, walletProvisioning } = await bulkCreateStudents(
     req.body.students,
     getBusinessId(req),
@@ -266,7 +281,10 @@ export const bulkCreateStudentsHandler = async (req: Request, res: Response): Pr
  *       409:
  *         description: Email, phone number or registration number already in use
  */
-export const updateStudentHandler = async (req: Request, res: Response): Promise<void> => {
+export const updateStudentHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const student = await updateStudentById(
     getStudentId(req),
     getBusinessId(req),
@@ -281,7 +299,12 @@ const sendStatusChangeResponse = (
   result: StudentStatusChangeResult,
   changedMessage: string,
   unchangedMessage: string,
-): void => successResponse(res, result.changed ? changedMessage : unchangedMessage, result);
+): void =>
+  successResponse(
+    res,
+    result.changed ? changedMessage : unchangedMessage,
+    result,
+  );
 
 /**
  * @swagger
@@ -319,14 +342,22 @@ const sendStatusChangeResponse = (
  *       409:
  *         description: Student's current status cannot be blocked, or status changed concurrently
  */
-export const blockStudentHandler = async (req: Request, res: Response): Promise<void> => {
+export const blockStudentHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const result = await blockStudent(
     getStudentId(req),
     getBusinessId(req),
     req.body.reason,
     getActor(req),
   );
-  sendStatusChangeResponse(res, result, "Student blocked successfully", "Student is already blocked");
+  sendStatusChangeResponse(
+    res,
+    result,
+    "Student blocked successfully",
+    "Student is already blocked",
+  );
 };
 
 /**
@@ -362,14 +393,22 @@ export const blockStudentHandler = async (req: Request, res: Response): Promise<
  *       409:
  *         description: Status changed concurrently
  */
-export const unblockStudentHandler = async (req: Request, res: Response): Promise<void> => {
+export const unblockStudentHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const result = await unblockStudent(
     getStudentId(req),
     getBusinessId(req),
     req.body?.reason,
     getActor(req),
   );
-  sendStatusChangeResponse(res, result, "Student unblocked successfully", "Student is not blocked");
+  sendStatusChangeResponse(
+    res,
+    result,
+    "Student unblocked successfully",
+    "Student is not blocked",
+  );
 };
 
 /**
@@ -400,7 +439,10 @@ export const unblockStudentHandler = async (req: Request, res: Response): Promis
  *       404:
  *         description: Student not found (or already deleted)
  */
-export const deleteStudentHandler = async (req: Request, res: Response): Promise<void> => {
+export const deleteStudentHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   await deleteStudentById(getStudentId(req), getBusinessId(req), getActor(req));
   successResponse(res, "Student deleted successfully");
 };
