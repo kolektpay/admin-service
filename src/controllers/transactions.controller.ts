@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-import { successResponse, errorResponse } from "../../utils/response.util";
-import { TransactionData } from "../../interfaces/transactions.interfaces";
+import { successResponse, errorResponse } from "../utils/response.util";
+import { TransactionData } from "../interfaces/transactions.interfaces";
 import {
   getSpecificWalletTransactionHistoryByReferenceNumber,
   getWalletTransactionHistoryForOneBusiness,
-} from "../../thirdPartyService/transactions.services";
-import { subtractDays } from "../../helpers/date.helper";
-import { isValidDate } from "../../helpers/date.helper";
+} from "../thirdPartyService/transactions.services";
+import { subtractDays } from "../helpers/date.helper";
+import { isValidDate } from "../helpers/date.helper";
 
 /**
  * @swagger

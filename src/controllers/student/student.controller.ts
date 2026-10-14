@@ -9,8 +9,8 @@ import {
   StudentStatusChangeResult,
   unblockStudent,
   updateStudentById,
-} from "../../services/admin.student.service";
-import { bulkCreateStudents } from "../../services/admin.student.bulk.service";
+} from "../../services/one.student.creation.service";
+import { bulkCreateStudents } from "../../services/student.bulk.creation.service";
 import { ListStudentsQuery } from "../../validations/studentManagement.schema";
 
 // Business and actor come from the JWT (requirePermission guarantees both are present)

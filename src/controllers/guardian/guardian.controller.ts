@@ -9,7 +9,7 @@ import {
   deleteGuardianInfo,
   getAllGuardiansAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
   updateGuardianInfo,
-} from "../../services/admin.guardian.service";
+} from "../../services/guardian.service";
 // import { extractRequestMetadata } from "../utils/request.metadata";
 import { UserModel } from "../../models/user.model";
 import { NotificationModel } from "../../models/notifications.model";

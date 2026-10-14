@@ -5,7 +5,7 @@ import {
   getAllPaymentLinksForOneBusinessHandler,
   getSpecificStudentWalletAccordingToBusinessIdHandler,
   getWalletDetailsonLoginHandler,
-} from "../../controllers/admin/wallet.controller";
+} from "../../controllers/wallet.controller";
 import { authenticateJWT } from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validation.middleware";
 import { createStudentWalletSchema } from "../../validations/createStudentWallet.schema";

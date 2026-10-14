@@ -5,17 +5,17 @@ import {
   getAllPaymentLinksOfOneBusinessByBusinessId,
   getSpecificStudentWallet,
   getWalletDetailsAfterLogin,
-} from "../../thirdPartyService/wallet.services";
-import { successResponse, errorResponse } from "../../utils/response.util";
+} from "../thirdPartyService/wallet.services";
+import { successResponse, errorResponse } from "../utils/response.util";
 import {
   GeneratePaymentLinkRequestBody,
   GetAllPaymentLinksParamsBody,
-} from "../../interfaces/wallet.interfaces";
-import { subtractDays } from "../../helpers/date.helper";
-import { AuditModel } from "../../models/audit.model";
-import { extractRequestMetadata } from "../../utils/request.metadata";
-import { CreateStudentWalletInterface } from "../../interfaces/walletcreationforstudent.interface";
-import { isStudentWalletCreated } from "../../models/isStudentWalletCreatedBoolean.model";
+} from "../interfaces/wallet.interfaces";
+import { subtractDays } from "../helpers/date.helper";
+import { AuditModel } from "../models/audit.model";
+import { extractRequestMetadata } from "../utils/request.metadata";
+import { CreateStudentWalletInterface } from "../interfaces/walletcreationforstudent.interface";
+import { isStudentWalletCreated } from "../models/isStudentWalletCreatedBoolean.model";
 
 /**
  * @swagger

@@ -13,7 +13,7 @@ import {
   mapStudentUniqueViolation,
   StudentActor,
   studentConflictError,
-} from "./admin.student.service";
+} from "./one.student.creation.service";
 
 const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
 
@@ -23,7 +23,8 @@ const ASSIGNABLE_GUARDIAN_STATUSES: GuardianStatus[] = ["active", "pending"];
 const WALLET_REQUEST_CONCURRENCY = 5;
 const TRANSACTION_TIMEOUT_MS = 30_000;
 
-const studentField = (index: number, field: string) => `students[${index}].${field}`;
+const studentField = (index: number, field: string) =>
+  `students[${index}].${field}`;
 
 // ==========================================
 // Pre-transaction validation
@@ -31,7 +32,7 @@ const studentField = (index: number, field: string) => `students[${index}].${fie
 
 /** Reject the batch if two records share an email, phone number or registration number. */
 const assertNoDuplicatesWithinBatch = (records: BulkStudentRecord[]): void => {
-  const fields = ["email",  "registrationNumber"] as const;
+  const fields = ["email", "registrationNumber"] as const;
   const details: IFieldError[] = [];
 
   for (const field of fields) {
@@ -75,14 +76,18 @@ const resolveGuardianIds = async (
   const guardianEmails = [...new Set(records.map((r) => r.guardianEmail))];
   const eligible = await prisma.guardians.findMany({
     where: {
-      OR: guardianEmails.map((email) => ({ email: { equals: email, mode: "insensitive" as const } })),
+      OR: guardianEmails.map((email) => ({
+        email: { equals: email, mode: "insensitive" as const },
+      })),
       businessId,
       deletedAt: null,
       status: { in: ASSIGNABLE_GUARDIAN_STATUSES },
     },
     select: { id: true, email: true },
   });
-  const guardianIdByEmail = new Map(eligible.map((g) => [g.email!.toLowerCase(), g.id]));
+  const guardianIdByEmail = new Map(
+    eligible.map((g) => [g.email!.toLowerCase(), g.id]),
+  );
 
   const details: IFieldError[] = [];
   const guardianIds = records.map((record, index) => {
@@ -150,7 +155,12 @@ const prepareStudents = (
     records.map(async (record, index) => {
       const temporaryPassword = TempPasswordTokenManager.generateToken();
       const hashedPassword = await bcrypt.hash(temporaryPassword, saltRounds);
-      return { record, guardianId: guardianIds[index], temporaryPassword, hashedPassword };
+      return {
+        record,
+        guardianId: guardianIds[index],
+        temporaryPassword,
+        hashedPassword,
+      };
     }),
   );
 
@@ -201,7 +211,8 @@ const insertStudentsAtomically = (
 
       // Match rows back to input by email (unique) rather than relying on insert order
       const studentIdByEmail = new Map(students.map((s) => [s.email, s.id]));
-      const idFor = (record: BulkStudentRecord) => studentIdByEmail.get(record.email)!;
+      const idFor = (record: BulkStudentRecord) =>
+        studentIdByEmail.get(record.email)!;
 
       await tx.guardianHasStudents.createMany({
         data: prepared.map(({ record, guardianId }) => ({
@@ -242,7 +253,9 @@ const insertStudentsAtomically = (
     { timeout: TRANSACTION_TIMEOUT_MS },
   );
 
-type CreatedStudent = Awaited<ReturnType<typeof insertStudentsAtomically>>[number];
+type CreatedStudent = Awaited<
+  ReturnType<typeof insertStudentsAtomically>
+>[number];
 
 // ==========================================
 // Wallet provisioning (after commit)
@@ -259,11 +272,14 @@ const runWithConcurrency = async <T>(
   worker: (item: T) => Promise<void>,
 ): Promise<void> => {
   const queue = [...items];
-  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    for (let item = queue.shift(); item !== undefined; item = queue.shift()) {
-      await worker(item);
-    }
-  });
+  const runners = Array.from(
+    { length: Math.min(limit, queue.length) },
+    async () => {
+      for (let item = queue.shift(); item !== undefined; item = queue.shift()) {
+        await worker(item);
+      }
+    },
+  );
   await Promise.all(runners);
 };
 
@@ -284,37 +300,50 @@ const provisionStudentWallets = async (
   const created: { studentId: bigint; walletId: string }[] = [];
   const pending: WalletProvisioningResult["pending"] = [];
 
-  await runWithConcurrency(students, WALLET_REQUEST_CONCURRENCY, async (student) => {
-    const record = recordByEmail.get(student.email)!;
-    try {
-      const response = await createStudentWallet({
-        businessId: Number(businessId),
-        student: {
-          firstName: student.firstName,
-          lastName: student.lastName,
-          middleName: student.middleName ?? undefined,
-          emailAddress: student.email,
-          mobileNumber: student.phoneNumber,
-          address: student.address,
-          city: record.city,
-          alias: record.alias,
-          studentId: Number(student.id),
-        },
-      });
+  await runWithConcurrency(
+    students,
+    WALLET_REQUEST_CONCURRENCY,
+    async (student) => {
+      const record = recordByEmail.get(student.email)!;
+      try {
+        const response = await createStudentWallet({
+          businessId: Number(businessId),
+          student: {
+            firstName: student.firstName,
+            lastName: student.lastName,
+            middleName: student.middleName ?? undefined,
+            emailAddress: student.email,
+            mobileNumber: student.phoneNumber,
+            address: student.address,
+            city: record.city,
+            alias: record.alias,
+            studentId: Number(student.id),
+          },
+        });
 
-      // The wallet provider resolves with { success: false } instead of throwing
-      const walletId: string | undefined = response?.data?.walletId;
-      if (response?.success === false) {
-        pending.push({ studentId: student.id, reason: "Wallet service rejected the request" });
-      } else if (!walletId) {
-        pending.push({ studentId: student.id, reason: "Wallet service returned no wallet id" });
-      } else {
-        created.push({ studentId: student.id, walletId });
+        // The wallet provider resolves with { success: false } instead of throwing
+        const walletId: string | undefined = response?.data?.walletId;
+        if (response?.success === false) {
+          pending.push({
+            studentId: student.id,
+            reason: "Wallet service rejected the request",
+          });
+        } else if (!walletId) {
+          pending.push({
+            studentId: student.id,
+            reason: "Wallet service returned no wallet id",
+          });
+        } else {
+          created.push({ studentId: student.id, walletId });
+        }
+      } catch {
+        pending.push({
+          studentId: student.id,
+          reason: "Wallet service unavailable",
+        });
       }
-    } catch {
-      pending.push({ studentId: student.id, reason: "Wallet service unavailable" });
-    }
-  });
+    },
+  );
 
   if (created.length) {
     await prisma.$transaction([
@@ -348,7 +377,10 @@ export const bulkCreateStudents = async (
   records: BulkStudentRecord[],
   businessId: bigint,
   actor: StudentActor,
-): Promise<{ students: CreatedStudent[]; walletProvisioning: WalletProvisioningResult }> => {
+): Promise<{
+  students: CreatedStudent[];
+  walletProvisioning: WalletProvisioningResult;
+}> => {
   const guardianIds = await validateBatch(records, businessId);
 
   const prepared = await prepareStudents(records, guardianIds);
@@ -362,7 +394,11 @@ export const bulkCreateStudents = async (
   }
 
   const recordByEmail = new Map(records.map((r) => [r.email, r]));
-  const walletProvisioning = await provisionStudentWallets(students, recordByEmail, businessId);
+  const walletProvisioning = await provisionStudentWallets(
+    students,
+    recordByEmail,
+    businessId,
+  );
 
   return { students, walletProvisioning };
 };

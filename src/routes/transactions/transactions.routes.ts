@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
   getWalletTransactionByReferenceNumberHandler,
   getWalletTransactionHistoryHandler,
-} from "../../controllers/admin/transactions.controller";
+} from "../../controllers/transactions.controller";
 import {
   transactionQuerySchema,
   transactionReferenceNumberParamsSchema,

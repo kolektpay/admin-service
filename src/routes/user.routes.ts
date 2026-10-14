@@ -3,12 +3,12 @@ import {
   authenticateJWT,
   checkIfStaffHasPaymentItemApprovalPermission,
   requireManager,
-} from "../../middleware/auth.middleware";
+} from "../middleware/auth.middleware";
 import {
   validate,
   validateUserParams,
   validateUserQueryParams,
-} from "../../middleware/validation.middleware";
+} from "../middleware/validation.middleware";
 import {
   viewAuditLogsHandler,
   fetchRolesAndPermissionsHandler,
@@ -22,15 +22,15 @@ import {
   enforcePasswordRotationHandler,
   changeAnyUserPasswordHandler,
   getUserByIdHandler,
-} from "../../controllers/guardian/guardian.controller";
+} from "../controllers/guardian/guardian.controller";
 import {
   getAllPaymentItemsGeneratedAccordingToBusinessIdAndClassIdHandler,
   createNewPaymentItemsAccordingToBusinessIdAndClassIdHandler,
   updatePaymentItemsAccordingToBusinessIdAndClassIdHandler,
   approvePaymentItemsAccordingToBusinessIdAndClassIdHandler,
-} from "../../controllers/paymentItem.controller";
+} from "../controllers/paymentItem.controller";
 
-import { paymentItemGeneratorSchema } from "../../validations/paymentItemGenerator.schema";
+import { paymentItemGeneratorSchema } from "../validations/paymentItemGenerator.schema";
 import {
   createUserValidationSchema,
   updateUserValidationSchema,
@@ -40,7 +40,7 @@ import {
   getUserValidationSchemaForReqBodyUuid,
   changeUserPasswordVoluntarilyValidationSchema,
   getUserWithOptionalQueryParamsAndSearch,
-} from "../../validations/uservalidation.schema";
+} from "../validations/uservalidation.schema";
 
 const router = Router();
 
