@@ -8,7 +8,7 @@ import { UserModel } from "../models/user.model";
 import {
   createNewPaymentItemEntry,
   getAllPaymentItemsAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
-} from "../services/paymentservice.service";
+} from "../services/payment.service";
 import { CreatePaymentItemPayload } from "../interfaces/paymentItem.interface";
 import { NotificationModel } from "../models/notifications.model";
 import { Emails } from "../utils/emailTemplate";

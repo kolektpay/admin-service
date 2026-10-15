@@ -6,7 +6,8 @@ import { AuditModel } from "../models/audit.model";
 import { NotificationModel } from "../models/notifications.model";
 import { createStudentWallet } from "../thirdPartyService/wallet.services";
 import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
-import { AppError, IFieldError } from "../middleware/error.middleware";
+import { AppError } from "../middleware/error.middleware";
+import { IFieldError } from "../interfaces/common.interface";
 import {
   getUniqueViolationField,
   isPrismaErrorCode,
@@ -17,16 +18,17 @@ import {
   UpdateStudentInput,
 } from "../validations/studentManagement.schema";
 import { StudentPublicRecord, studentPublicSelect } from "../models/student.model";
+import {
+  PreparedStudent,
+  StudentActor,
+  StudentStatusChangeResult,
+  StudentUniqueFields,
+  WalletProvisioningResult,
+} from "../interfaces/student.interfaces";
 
 // ==========================================
 // Shared helpers
 // ==========================================
-
-interface StudentUniqueFields {
-  email?: string;
-  phoneNumber?: string;
-  registrationNumber?: string | null;
-}
 
 // Most specific first: "email" also appears inside other column names' metadata
 const STUDENT_UNIQUE_FIELD_ALIASES: Record<string, string[]> = {
@@ -254,11 +256,6 @@ export const listStudents = async (
 // Update
 // ==========================================
 
-export interface StudentActor {
-  userId: string;
-  ip?: string;
-}
-
 const findActiveStudent = (studentId: bigint, businessId: bigint) =>
   prisma.students.findFirst({
     where: { id: studentId, businessId, deletedAt: null },
@@ -320,12 +317,6 @@ export const updateStudentById = async (
 // and suspended students are managed through other flows and cannot be
 // blocked here, so unblocking (which restores "active") never revives them.
 const BLOCKABLE_STATUSES: StudentStatus[] = ["active", "pending", "inactive"];
-
-export interface StudentStatusChangeResult {
-  studentId: bigint;
-  status: StudentStatus;
-  changed: boolean;
-}
 
 /**
  * Block a student. Repeating the request on a blocked student is a no-op.
@@ -582,13 +573,6 @@ const validateBatch = async (
 // Transaction
 // ==========================================
 
-interface PreparedStudent {
-  record: BulkStudentRecord;
-  guardianId: bigint;
-  temporaryPassword: string;
-  hashedPassword: string;
-}
-
 /** Password hashing is slow, so it happens before the transaction opens. */
 const prepareStudents = (
   records: BulkStudentRecord[],
@@ -703,11 +687,6 @@ type CreatedStudent = Awaited<
 // ==========================================
 // Wallet provisioning (after commit)
 // ==========================================
-
-export interface WalletProvisioningResult {
-  created: number;
-  pending: { studentId: bigint; reason: string }[];
-}
 
 const runWithConcurrency = async <T>(
   items: T[],

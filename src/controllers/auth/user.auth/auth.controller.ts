@@ -19,6 +19,7 @@ import { UserModel } from "../../../models/user.model";
 import { PasswordResetTokenManager } from "../../../managers/passwordResetManager";
 import { UserPasswordResetModel } from "../../../models/userPasswordReset.model";
 import { NotificationModel } from "../../../models/notifications.model";
+import { OtpNotificationData } from "../../../interfaces/notification.interface";
 import { PasswordHistoryModel } from "../../../models/passwordHistory.model";
 import bcrypt from "bcrypt";
 import { passwordHistoryChecker } from "../../../managers/passwordHistoryChecker";
@@ -26,7 +27,7 @@ import { AuditModel } from "../../../models/audit.model";
 import { UserRoleModel } from "../../../models/userHasRole.model";
 import { RolePermissionModel } from "../../../models/permissions.model";
 import { ICreateUserDTO } from "../../../interfaces/user.interface";
-import { createUserBeforeOtpVerify } from "../../../services/adminservice.service";
+import { createUserBeforeOtpVerify } from "../../../services/admin.service";
 import { IServiceResponse } from "../../../interfaces/common.interface";
 import { ICreateBusinessDTO } from "../../../interfaces/business.interface";
 import { createUserBusiness } from "../../../services/userbusiness.service";
@@ -1191,13 +1192,6 @@ export const registerUserWithKolektSuperAdminHandler = async (
 
         try {
           serviceResponse = await createUserBeforeOtpVerify(request);
-
-          interface OtpNotificationData {
-            otp: string;
-            email: string;
-            firstName: string;
-            lastName: string;
-          }
 
           const fetchUserInfo = await authenticateUserService(request.email);
 

@@ -59,3 +59,9 @@ export interface UserLoginInfoIfNo2faInterface {
   totpEnabled: boolean;
   totpRequired: boolean;
 }
+
+export interface PasswordCheckResult {
+  success: boolean;
+  accountBlocked?: boolean;
+  failedLoginCount?: number;
+}

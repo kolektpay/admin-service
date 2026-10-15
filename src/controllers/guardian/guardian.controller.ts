@@ -23,7 +23,7 @@ import {
   blockUser,
   unblockUser,
   getAllUsersAndCheckIfSearchAndStatusCriteriaexist,
-} from "../../services/adminservice.service";
+} from "../../services/admin.service";
 import dotenv from "dotenv";
 import prisma from "../../config/database";
 import { UserRoleModel } from "../../models/userHasRole.model";

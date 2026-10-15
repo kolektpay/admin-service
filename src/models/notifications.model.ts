@@ -1,41 +1,15 @@
 import { EmailStatus, Prisma } from "@prisma/client";
 import prisma from "../config/database";
-import { EmailUser } from "../utils/emailTemplate";
+import {
+  EmailUser,
+  LoginNotificationData,
+  MustChangePasswordNotificationData,
+  OtpNotificationData,
+  PasswordResetNotificationData,
+} from "../interfaces/notification.interface";
 // import { Emails } from "../utils/emailTemplate";
 
 // const email = Emails.getEmail("PAYMENT_SUCCESSFUL");
-
-interface LoginNotificationData {
-  email: string;
-  firstName: string;
-  lastName: string;
-  ipAddress?: string;
-  device?: string;
-  location?: string;
-  browser?: string;
-  os?: string;
-}
-
-interface PasswordResetNotificationData {
-  email: string;
-  fullName: string;
-  resetLink: string;
-}
-
-interface OtpNotificationData {
-  otp: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
-
-export interface MustChangePasswordNotificationData {
-  email: string;
-  firstName: string;
-  lastName: string;
-  generatedPassword: string;
-  resetLink: string;
-}
 
 export class NotificationModel {
   /**

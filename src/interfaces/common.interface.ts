@@ -13,3 +13,8 @@ export interface IServiceResponse{
 
 
 }
+
+export interface IFieldError {
+  field: string;
+  message: string;
+}

@@ -1,9 +1,3 @@
-export interface EmailUser {
-  email: string;
-  firstName: string;
-  lastName: string;
-}
-
 export class Emails {
   public static readonly emails = [
     {

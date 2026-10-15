@@ -1,10 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { logExceptionToTelegram } from "../services/telegramLogger.service";
-
-export interface IFieldError {
-  field: string;
-  message: string;
-}
+import { IFieldError } from "../interfaces/common.interface";
 
 export class AppError extends Error {
   statusCode: number;
