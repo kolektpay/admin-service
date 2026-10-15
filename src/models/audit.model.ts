@@ -21,34 +21,6 @@ export class AuditModel {
     });
   }
 
-  static async logFailedLoginForStudent(
-    studentId: bigint | null,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        studentId,
-        ipAddress,
-        result: "failure",
-        status: "failed_login_attempt",
-      },
-    });
-  }
-
-  static async logFailedLoginForGuardian(
-    guardianId: bigint | null,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        guardianId,
-        ipAddress,
-        result: "failure",
-        status: "failed_login_attempt",
-      },
-    });
-  }
-
   /**
    * Log successful login to audit log
    */
@@ -59,34 +31,6 @@ export class AuditModel {
     await prisma.auditLogs.create({
       data: {
         userId,
-        ipAddress,
-        result: "success",
-        status: "successful_login_attempt",
-      },
-    });
-  }
-
-  static async logSuccessfulLoginForStudent(
-    studentId: bigint,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        studentId,
-        ipAddress,
-        result: "success",
-        status: "successful_login_attempt",
-      },
-    });
-  }
-
-  static async logSuccessfulLoginForGuardian(
-    guardianId: bigint,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        guardianId,
         ipAddress,
         result: "success",
         status: "successful_login_attempt",
@@ -113,35 +57,6 @@ export class AuditModel {
   }
   //log blocked student account
 
-  static async logBlockedStudentAccount(
-    studentId: bigint | null,
-    ipAddress: string | undefined,
-    reason: string,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        studentId,
-        ipAddress,
-        result: "blocked",
-        status: `student_account_blocked due to ${reason}`,
-      },
-    });
-  }
-
-  static async logBlockedGuardianAccount(
-    guardianId: bigint | null,
-    ipAddress: string | undefined,
-    reason: string,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        guardianId,
-        ipAddress,
-        result: "blocked",
-        status: `student_account_blocked due to ${reason}`,
-      },
-    });
-  }
   /**
    * Log unblocking account attempt
    */
@@ -575,62 +490,6 @@ export class AuditModel {
     }
   }
 
-  static async logFetchedAllBusinessBanksOperation(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "All bank accounts for this business successfully retrieved",
-      },
-    });
-  }
-
-  static async logDeleteExistingBankFromBusiness(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "Bank account for this business successfully deleted",
-      },
-    });
-  }
-
-  static async logUpdateBankStatusToActiveForBusiness(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "Bank account for this business successfully updated to active",
-      },
-    });
-  }
-
-  static async logFetchCurrentActiveBankForOneBusiness(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "Current active bank info retrieved",
-      },
-    });
-  }
-
   static async logPasswordRotationEnforcementOperation(
     userId: string,
     ipAddress?: string | undefined,
@@ -716,22 +575,6 @@ export class AuditModel {
     });
   }
 
-  static async logEditedPermissionsForStudent(
-    guardianId: bigint,
-    studentId: bigint,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        guardianId,
-        studentId,
-        ipAddress,
-        result: "success",
-        status: "guardian_edited_student_permissions",
-      },
-    });
-  }
-
   static async logUserLogout(
     userId: string,
     ipAddress: string | undefined,
@@ -742,34 +585,6 @@ export class AuditModel {
         ipAddress,
         result: "success",
         status: "user_logout",
-      },
-    });
-  }
-
-  static async logUserLogoutForStudent(
-    studentId: bigint,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        studentId,
-        ipAddress,
-        result: "success",
-        status: "student_logout",
-      },
-    });
-  }
-
-  static async logUserLogoutForGuardian(
-    guardianId: bigint,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        guardianId,
-        ipAddress,
-        result: "success",
-        status: "guardian_logout",
       },
     });
   }

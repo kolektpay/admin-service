@@ -1,11 +1,4 @@
 /**
- * Format date to ISO string
- */
-export const formatDate = (date: Date): string => {
-  return date.toISOString();
-};
-
-/**
  * Get current timestamp
  */
 export const getCurrentTimestamp = (): Date => {
@@ -52,17 +45,6 @@ export const isValidDate = (date: string): boolean => {
  */
 export const isPastDate = (date: Date): boolean => {
   return date < new Date();
-};
-
-/**
- * Format date to readable string
- */
-export const formatReadableDate = (date: Date): string => {
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 };
 
 /**

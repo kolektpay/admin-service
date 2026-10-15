@@ -1,14 +1,5 @@
 import { onBoardTrackerType } from "@prisma/client";
 
-export interface IUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface ICreateUserDTO {
   email: string;
   firstName: string;

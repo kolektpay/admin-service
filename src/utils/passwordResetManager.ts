@@ -55,36 +55,4 @@ export class PasswordResetTokenManager {
     return { valid: true };
   }
 
-  /**
-   * Clear expired tokens from database
-   * @param clearExpiredTokensCallback - DB function to remove expired tokens
-   */
-  static async cleanupExpiredTokens(
-    clearExpiredTokensCallback: () => Promise<number>,
-  ): Promise<number> {
-    try {
-      const deletedCount = await clearExpiredTokensCallback();
-      console.log(`Cleaned up ${deletedCount} expired password reset tokens`);
-      return deletedCount;
-    } catch (error) {
-      console.error("Error cleaning up expired tokens:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Invalidate a token (set it to null in DB)
-   * @param invalidateTokenCallback - DB function to invalidate token
-   */
-  static async invalidateToken(
-    invalidateTokenCallback: () => Promise<void>,
-  ): Promise<void> {
-    try {
-      await invalidateTokenCallback();
-      console.log("Token invalidated successfully");
-    } catch (error) {
-      console.error("Error invalidating token:", error);
-      throw error;
-    }
-  }
 }

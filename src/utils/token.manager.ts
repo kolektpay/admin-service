@@ -528,13 +528,6 @@ class TokenManager {
     return { decoded, tokenData };
   }
 
-  static async revokeToken(tokenId: string): Promise<void> {
-    await prisma.userTokens.update({
-      where: { tokenId },
-      data: { revoked: true },
-    });
-  }
-
   //   ──────────────────────────────────────────────────────────────
   //   Revoke tokens – accepts an explicit role for bigint ids so it
   //   doesn't have to re-run the student/guardian lookup when the

@@ -25,12 +25,6 @@ export interface KolektSuperAdminTokenPayload {
    role: string;
 }
 
-export interface Setup2FAResponse {
-  secret: string; // temporary TOTP secret
-  otpauthUri: string; // URI for manual entry / authenticator apps
-  qrCodeBase64: string; // Base64 PNG of QR code
-}
-
 export interface FinalUserInfoInterface {
   id: string;
   firstName: string;

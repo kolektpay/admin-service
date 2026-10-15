@@ -3,14 +3,14 @@ import { successResponse } from "../../utils/response.util";
 import { extractRequestMetadata } from "../../utils/request.metadata";
 import {
   blockStudent,
+  bulkCreateStudents,
   deleteStudentById,
   listStudents,
   StudentActor,
   StudentStatusChangeResult,
   unblockStudent,
   updateStudentById,
-} from "../../services/one.student.creation.service";
-import { bulkCreateStudents } from "../../services/student.bulk.creation.service";
+} from "../../services/studentservice.service";
 import { ListStudentsQuery } from "../../validations/studentManagement.schema";
 
 // Business and actor come from the JWT (requirePermission guarantees both are present)

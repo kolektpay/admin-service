@@ -10,9 +10,4 @@ export class UserToBusinessModel {
     });
   }
 
-  static async getAllUsersForOneBusiness(businessId: bigint) {
-    return await prisma.userBusiness.findMany({
-      where: { businessId: businessId },
-    });
-  }
 }

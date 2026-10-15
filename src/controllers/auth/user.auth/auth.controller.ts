@@ -4,7 +4,7 @@ import {
   authenticateUserService,
   logInService,
   passwordValidatorService,
-} from "../../../services/auth.service";
+} from "../../../services/adminauth.service";
 import TokenManager from "../../../utils/token.manager";
 import { extractRequestMetadata } from "../../../utils/request.metadata";
 import TotpManager from "../../../utils/twoFactorManager";
@@ -26,7 +26,7 @@ import { AuditModel } from "../../../models/audit.model";
 import { UserRoleModel } from "../../../models/userHasRole.model";
 import { RolePermissionModel } from "../../../models/permissions.model";
 import { ICreateUserDTO } from "../../../interfaces/user.interface";
-import { createUserBeforeOtpVerify } from "../../../services/user.service";
+import { createUserBeforeOtpVerify } from "../../../services/adminservice.service";
 import { IServiceResponse } from "../../../interfaces/common.interface";
 import { ICreateBusinessDTO } from "../../../interfaces/business.interface";
 import { createUserBusiness } from "../../../services/userbusiness.service";

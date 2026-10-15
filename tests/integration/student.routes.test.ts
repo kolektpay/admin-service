@@ -36,7 +36,7 @@ import request from "supertest";
 import prismaClient from "../../src/config/database";
 import TokenManager from "../../src/utils/token.manager";
 import { incrementAndCheck } from "../../src/cache/throttleStore";
-import studentRouter from "../../src/routes/admin/admin.student.routes";
+import studentRouter from "../../src/routes/student/student.routes";
 import { errorHandler, notFoundHandler } from "../../src/middleware/error.middleware";
 import { PrismaMock } from "../helpers/prismaMock";
 import { validStudentRecord } from "../helpers/fixtures";

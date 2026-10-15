@@ -23,7 +23,7 @@ import {
   blockUser,
   unblockUser,
   getAllUsersAndCheckIfSearchAndStatusCriteriaexist,
-} from "../../services/user.service";
+} from "../../services/adminservice.service";
 import dotenv from "dotenv";
 import prisma from "../../config/database";
 import { UserRoleModel } from "../../models/userHasRole.model";
@@ -31,7 +31,7 @@ import { userHasRoleData } from "../../interfaces/userRole.interfaces";
 import { TempPasswordTokenManager } from "../../utils/tempPasswordTokenManager";
 import { RoleHasPermissionsModel } from "../../models/rolesHasPermissions.model";
 import { passwordHistoryChecker } from "../../utils/passwordHistoryChecker";
-import { passwordValidatorService } from "../../services/auth.service";
+import { passwordValidatorService } from "../../services/adminauth.service";
 import { UserToBusinessModel } from "../../models/userIdToBusiness.model";
 
 dotenv.config();

@@ -25,7 +25,7 @@ import {
   mapStudentUniqueViolation,
   unblockStudent,
   updateStudentById,
-} from "../../src/services/admin.student.service";
+} from "../../src/services/studentservice.service";
 import { listStudentsQuerySchema } from "../../src/validations/studentManagement.schema";
 import { PrismaMock } from "../helpers/prismaMock";
 import { prismaError } from "../helpers/fixtures";

@@ -49,12 +49,4 @@ static async createPasswordHistory(
   }
 }
 
-  static async obtainPasswordInfo(userId: string) {
-    return await prisma.passwordHistory.findMany({
-      where: {
-        userId,
-      },
-      select: { password: true },
-    });
-  }
 }

@@ -59,38 +59,6 @@ export class NotificationModel {
     });
   }
 
-  static async sendLoginNotificationForStudent(
-    data: LoginNotificationData,
-  ): Promise<void> {
-    const clientData = Object.values(data).join(",");
-    await prisma.notifications.create({
-      data: {
-        subject: "student_login_detected",
-        content: clientData,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
-        type: "login_email",
-        status: EmailStatus.PENDING,
-      },
-    });
-  }
-
-  static async sendLoginNotificationForGuardian(
-    data: LoginNotificationData,
-  ): Promise<void> {
-    const clientData = Object.values(data).join(",");
-    await prisma.notifications.create({
-      data: {
-        subject: "guardian_login_detected",
-        content: clientData,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
-        type: "login_email",
-        status: EmailStatus.PENDING,
-      },
-    });
-  }
-
   /**
    * Send password reset email notification
    */
@@ -159,14 +127,6 @@ export class NotificationModel {
 
       status: EmailStatus.PENDING,
     };
-  }
-
-  static async sendTempPasswordNotificationForStudents(
-    data: MustChangePasswordNotificationData,
-  ): Promise<void> {
-    await prisma.notifications.create({
-      data: NotificationModel.buildTempPasswordNotificationForStudents(data),
-    });
   }
 
   static async sendTempPasswordNotificationForGuardians(
