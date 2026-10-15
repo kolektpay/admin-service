@@ -4,7 +4,7 @@ import { TransactionData } from "../interfaces/transactions.interfaces";
 import {
   getSpecificWalletTransactionHistoryByReferenceNumber,
   getWalletTransactionHistoryForOneBusiness,
-} from "../thirdPartyService/transactions.services";
+} from "../thirdPartyService/wallet.services";
 import { subtractDays } from "../helpers/date.helper";
 import { isValidDate } from "../helpers/date.helper";
 

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { errorResponse } from "../utils/response.util";
-import TokenManager from "../utils/token.manager";
+import TokenManager from "../managers/token.manager";
 import ApiError from "../utils/apiError";
 import prisma from "../config/database";
 

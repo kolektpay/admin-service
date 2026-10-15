@@ -1,7 +1,7 @@
 import { generateSecret, generate, verify } from "otplib";
 import prisma from "../config/database";
 import { getTimestampMinutesFromNow } from "../helpers/date.helper";
-import ApiError from "./apiError";
+import ApiError from "../utils/apiError";
 
 // OTP config
 const OTP_PERIOD_SECONDS = 900; // 15 minutes

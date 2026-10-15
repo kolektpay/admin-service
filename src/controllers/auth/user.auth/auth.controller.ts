@@ -4,10 +4,10 @@ import {
   authenticateUserService,
   logInService,
   passwordValidatorService,
-} from "../../../services/adminauth.service";
-import TokenManager from "../../../utils/token.manager";
+} from "../../../services/auth.service";
+import TokenManager from "../../../managers/token.manager";
 import { extractRequestMetadata } from "../../../utils/request.metadata";
-import TotpManager from "../../../utils/twoFactorManager";
+import TotpManager from "../../../managers/twoFactorManager";
 import {
   FinalUserInfoInterface,
   KolektSuperAdminLoginInfoInterface,
@@ -16,12 +16,12 @@ import {
   UserLoginInfoInterface,
 } from "../../../interfaces/auth.interface";
 import { UserModel } from "../../../models/user.model";
-import { PasswordResetTokenManager } from "../../../utils/passwordResetManager";
+import { PasswordResetTokenManager } from "../../../managers/passwordResetManager";
 import { UserPasswordResetModel } from "../../../models/userPasswordReset.model";
 import { NotificationModel } from "../../../models/notifications.model";
 import { PasswordHistoryModel } from "../../../models/passwordHistory.model";
 import bcrypt from "bcrypt";
-import { passwordHistoryChecker } from "../../../utils/passwordHistoryChecker";
+import { passwordHistoryChecker } from "../../../managers/passwordHistoryChecker";
 import { AuditModel } from "../../../models/audit.model";
 import { UserRoleModel } from "../../../models/userHasRole.model";
 import { RolePermissionModel } from "../../../models/permissions.model";
@@ -30,8 +30,8 @@ import { createUserBeforeOtpVerify } from "../../../services/adminservice.servic
 import { IServiceResponse } from "../../../interfaces/common.interface";
 import { ICreateBusinessDTO } from "../../../interfaces/business.interface";
 import { createUserBusiness } from "../../../services/userbusiness.service";
-import { TempPasswordTokenManager } from "../../../utils/tempPasswordTokenManager";
-import OtpGenerator from "../../../utils/otpRegistrationManager";
+import { TempPasswordTokenManager } from "../../../managers/tempPasswordTokenManager";
+import OtpGenerator from "../../../managers/otpRegistrationManager";
 import dotenv from "dotenv";
 import { onBoardTrackerType } from "@prisma/client";
 

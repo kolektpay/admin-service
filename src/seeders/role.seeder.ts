@@ -1,5 +1,5 @@
 import prisma from "../config/database";
-import { ROLES } from "../utils/globalRoles";
+import { ROLES } from "./data/globalRoles";
 
 console.log(ROLES);
 export const roleSeeder = async () => {

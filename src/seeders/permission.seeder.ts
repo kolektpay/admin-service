@@ -1,5 +1,5 @@
 import prisma from "../config/database";
-import { PERMISSIONS } from "../utils/globalPermission";
+import { PERMISSIONS } from "./data/globalPermission";
 
 const { admin, students, guardians, kolektSuperAdmin } = PERMISSIONS;
 

@@ -8,7 +8,7 @@ import {
 
 import { UserTokens } from "@prisma/client";
 import prisma from "../config/database";
-import ApiError from "./apiError";
+import ApiError from "../utils/apiError";
 import { UserRoleModel } from "../models/userHasRole.model";
 
 // ──────────────────────────────────────────────────────────────

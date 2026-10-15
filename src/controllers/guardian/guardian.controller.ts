@@ -28,10 +28,10 @@ import dotenv from "dotenv";
 import prisma from "../../config/database";
 import { UserRoleModel } from "../../models/userHasRole.model";
 import { userHasRoleData } from "../../interfaces/userRole.interfaces";
-import { TempPasswordTokenManager } from "../../utils/tempPasswordTokenManager";
+import { TempPasswordTokenManager } from "../../managers/tempPasswordTokenManager";
 import { RoleHasPermissionsModel } from "../../models/rolesHasPermissions.model";
-import { passwordHistoryChecker } from "../../utils/passwordHistoryChecker";
-import { passwordValidatorService } from "../../services/adminauth.service";
+import { passwordHistoryChecker } from "../../managers/passwordHistoryChecker";
+import { passwordValidatorService } from "../../services/auth.service";
 import { UserToBusinessModel } from "../../models/userIdToBusiness.model";
 
 dotenv.config();

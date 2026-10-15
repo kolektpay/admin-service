@@ -5,7 +5,7 @@ import { getCurrentTimestamp } from "../helpers/date.helper";
 import { AuditModel } from "../models/audit.model";
 import { NotificationModel } from "../models/notifications.model";
 import { createStudentWallet } from "../thirdPartyService/wallet.services";
-import { TempPasswordTokenManager } from "../utils/tempPasswordTokenManager";
+import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
 import { AppError, IFieldError } from "../middleware/error.middleware";
 import {
   getUniqueViolationField,

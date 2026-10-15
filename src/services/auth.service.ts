@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import TokenManager from "../utils/token.manager";
+import TokenManager from "../managers/token.manager";
 
 import { IUserResponse } from "../interfaces/user.interface";
 import { isPastDate } from "../helpers/date.helper";

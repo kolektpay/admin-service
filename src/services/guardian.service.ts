@@ -2,7 +2,7 @@ import prisma from "../config/database";
 import ApiError from "../utils/apiError";
 import { getCurrentTimestamp } from "../helpers/date.helper";
 import bcrypt from "bcrypt";
-import { TempPasswordTokenManager } from "../utils/tempPasswordTokenManager";
+import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
 import { NotificationModel } from "../models/notifications.model";
 import {
   IGuardianFormData,

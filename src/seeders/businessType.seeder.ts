@@ -1,5 +1,5 @@
 import prisma from "../config/database";
-import { BUSINESS_TYPES } from "../utils/globalBusinessTypes";
+import { BUSINESS_TYPES } from "./data/globalBusinessTypes";
 
 export const businessTypeSeeder = async () => {
   await prisma.businessTypes.deleteMany();
