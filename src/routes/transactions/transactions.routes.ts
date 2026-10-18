@@ -1,18 +1,19 @@
 import { Router } from "express";
+
 import {
   getWalletTransactionByReferenceNumberHandler,
   getWalletTransactionHistoryHandler,
 } from "../../controllers/transactions.controller";
+import { authenticateJWT } from "../../middleware/auth.middleware";
+import {
+  validateUserParams,
+  validateUserQueryParams,
+} from "../../middleware/validation.middleware";
 import {
   transactionQuerySchema,
   transactionReferenceNumberParamsSchema,
   transactionWalletIdParamsSchema,
 } from "../../validations/transaction.schema";
-import {
-  validateUserParams,
-  validateUserQueryParams,
-} from "../../middleware/validation.middleware";
-import { authenticateJWT } from "../../middleware/auth.middleware";
 
 const router = Router();
 

@@ -1,11 +1,14 @@
 import prisma from "../config/database";
+import { rolesVisibleTo } from "../services/role.service";
 
 export class RoleHasPermissionsModel {
   /**
    * Get all permissions for a role with full permission details
    */
-  static async getRoleAndPermissions() {
-    const roles = await prisma.role.findMany({});
+  static async getRoleAndPermissions(businessId: bigint) {
+    const roles = await prisma.role.findMany({
+      where: rolesVisibleTo(businessId),
+    });
 
     let resultObject = {};
 

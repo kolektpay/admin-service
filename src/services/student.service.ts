@@ -1,23 +1,13 @@
-import bcrypt from "bcrypt";
 import { GuardianStatus, Prisma, StudentStatus } from "@prisma/client";
+import bcrypt from "bcrypt";
+
 import prisma from "../config/database";
 import { getCurrentTimestamp } from "../helpers/date.helper";
-import { AuditModel } from "../models/audit.model";
-import { NotificationModel } from "../models/notifications.model";
-import { createStudentWallet } from "../thirdPartyService/wallet.services";
-import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
-import { AppError } from "../middleware/error.middleware";
-import { IFieldError } from "../interfaces/common.interface";
 import {
   getUniqueViolationField,
   isPrismaErrorCode,
 } from "../helpers/prismaError.helper";
-import {
-  BulkStudentRecord,
-  ListStudentsQuery,
-  UpdateStudentInput,
-} from "../validations/studentManagement.schema";
-import { StudentPublicRecord, studentPublicSelect } from "../models/student.model";
+import { IFieldError } from "../interfaces/common.interface";
 import {
   PreparedStudent,
   StudentActor,
@@ -25,6 +15,17 @@ import {
   StudentUniqueFields,
   WalletProvisioningResult,
 } from "../interfaces/student.interfaces";
+import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
+import { AppError } from "../middleware/error.middleware";
+import { AuditModel } from "../models/audit.model";
+import { NotificationModel } from "../models/notifications.model";
+import { StudentPublicRecord, studentPublicSelect } from "../models/student.model";
+import { createStudentWallet } from "../thirdPartyService/wallet.services";
+import {
+  BulkStudentRecord,
+  ListStudentsQuery,
+  UpdateStudentInput,
+} from "../validations/studentManagement.schema";
 
 // ==========================================
 // Shared helpers

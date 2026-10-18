@@ -16,15 +16,6 @@ export interface TokenPayload {
   role: string;
 }
 
-export interface KolektSuperAdminTokenPayload {
-  userId?: string;
-  studentId?: bigint;
-  guardianId?: bigint;
-  tokenId: string;
-  type: "access" | "refresh";
-   role: string;
-}
-
 export interface FinalUserInfoInterface {
   id: string;
   firstName: string;
@@ -36,19 +27,6 @@ export interface UserLoginInfoInterface {
   name: string;
   accessToken: string;
   refreshToken: string;
-  userEmail: string;
-  totpEnabled: boolean;
-}
-
-export interface KolektSuperAdminLoginInfoInterface {
-  name: string;
-  role: string[];
-  accessToken: string;
-  refreshToken: string;
-  permissions: {
-    menus: string[];
-    actions: string[];
-  };
   userEmail: string;
   totpEnabled: boolean;
 }

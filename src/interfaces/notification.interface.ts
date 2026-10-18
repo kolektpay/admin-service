@@ -21,13 +21,6 @@ export interface PasswordResetNotificationData {
   resetLink: string;
 }
 
-export interface OtpNotificationData {
-  otp: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
-
 export interface MustChangePasswordNotificationData {
   email: string;
   firstName: string;

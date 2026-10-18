@@ -1,11 +1,11 @@
+import { PaymentItemStatus, PaymentType } from "@prisma/client";
+
 import prisma from "../config/database";
 import {
   CreatePaymentItemPayload,
   CreatePaymentItemPayloadWithNullableAccountInfo,
   StudentInvoiceWithPaymentStatus,
 } from "../interfaces/paymentItem.interface";
-
-import { PaymentItemStatus, PaymentType } from "@prisma/client";
 import ApiError from "../utils/apiError";
 
 /**

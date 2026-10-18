@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+
 import { getTimestampMinutesFromNow, isPastDate } from "../helpers/date.helper";
 
 export class PasswordResetTokenManager {

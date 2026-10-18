@@ -1,4 +1,5 @@
-// import { permissionsSeeder } from "./permission.seeder";
+import { permissionsSeeder } from "./permission.seeder";
+import { rolesHasPermissionSeeder } from "./rolesHasPermission.seeder";
 import prisma from "../config/database";
 // import { roleSeeder } from "./role.seeder";
 
@@ -7,27 +8,24 @@ import prisma from "../config/database";
 // import {  businessTypeSeeder  } from "./businessType.seeder";
 // import { guardianSeeder } from "./guardians.seeder";
 // import { userHasRoleSeeder } from "./userHasRole.seeder";
-// import { permissionsSeeder } from "./permission.seeder";
 // import { studentsAndGuardiansHavePermissionsSeeder } from "./studentsAndGuardiansHavePermission.seedeer";
-// import prisma from "../config/database";
 // import { studentSeeder } from "./students.seeder";
 // import { subclassSeeder } from "./subclass.seeder";
 // import { seedGuardianHasStudents } from "./guardianHasStudents.seeder";
 
 export const runSeeders = async () => {
   // await userSeeder();
-  // await permissionsSeeder();
+  await permissionsSeeder();
   // await businessTypeSeeder();
   // await guardianSeeder();
   // await classSeeder();
   // await subclassSeeder();
   // await roleSeeder();
-  // await rolesHasPermissionSeeder();
+  await rolesHasPermissionSeeder();
   // await studentSeeder();
   // await seedGuardianHasStudents();
- 
+
   // await userHasRoleSeeder();
-  // await permissionsSeeder();
   //  await studentsAndGuardiansHavePermissionsSeeder();
 };
 

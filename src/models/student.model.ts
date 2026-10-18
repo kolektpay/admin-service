@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+
 import prisma from "../config/database";
 import { getCurrentTimestamp } from "../helpers/date.helper";
 import ApiError from "../utils/apiError";

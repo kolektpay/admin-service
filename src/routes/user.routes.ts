@@ -1,27 +1,21 @@
 import { Router } from "express";
+
 import {
-  authenticateJWT,
-  checkIfStaffHasPaymentItemApprovalPermission,
-  requireManager,
-} from "../middleware/auth.middleware";
-import {
-  validate,
-  validateUserParams,
-  validateUserQueryParams,
-} from "../middleware/validation.middleware";
+  assignRoleHandler,
+  blockAdminHandler,
+  createAdminHandler,
+  deleteAdminHandler,
+  getAdminHandler,
+  listAdminsHandler,
+  unblockAdminHandler,
+  updateAdminHandler,
+  updateAdminStatusHandler,
+} from "../controllers/admin/admin.controller";
 import {
   viewAuditLogsHandler,
   fetchRolesAndPermissionsHandler,
-  getEveryUserHandler,
-  createNewUserHandler,
-  updateExistingUserHandler,
-  deleteAUserHandler,
-  blockExistingUserHandler,
-  unblockExistingUserHandler,
-  assignRoleToUserHandler,
   enforcePasswordRotationHandler,
   changeAnyUserPasswordHandler,
-  getUserByIdHandler,
 } from "../controllers/guardian/guardian.controller";
 import {
   getAllPaymentItemsGeneratedAccordingToBusinessIdAndClassIdHandler,
@@ -29,20 +23,35 @@ import {
   updatePaymentItemsAccordingToBusinessIdAndClassIdHandler,
   approvePaymentItemsAccordingToBusinessIdAndClassIdHandler,
 } from "../controllers/paymentItem.controller";
-
+import {
+  authenticateJWT,
+  checkIfStaffHasPaymentItemApprovalPermission,
+  requireManager,
+  requirePermission,
+} from "../middleware/auth.middleware";
+import { validate, validateRequest } from "../middleware/validation.middleware";
+import { asyncHandler } from "../utils/asyncHandler";
+import {
+  adminIdParamsSchema,
+  createAdminSchema,
+  listAdminsQuerySchema,
+  roleAssignmentSchema,
+  updateAdminSchema,
+  updateAdminStatusSchema,
+} from "../validations/adminManagement.schema";
 import { paymentItemGeneratorSchema } from "../validations/paymentItemGenerator.schema";
 import {
-  createUserValidationSchema,
-  updateUserValidationSchema,
-  getUserValidationByUuidSchema,
   blockUserValidationSchema,
-  roleActionSchema,
   getUserValidationSchemaForReqBodyUuid,
   changeUserPasswordVoluntarilyValidationSchema,
-  getUserWithOptionalQueryParamsAndSearch,
 } from "../validations/uservalidation.schema";
 
 const router = Router();
+
+const canReadAdmins = requirePermission("admin.user_management.read_user");
+const canCreateAdmins = requirePermission("admin.user_management.create_user");
+const canUpdateAdmins = requirePermission("admin.user_management.update_user");
+const canDeleteAdmins = requirePermission("admin.user_management.delete_user");
 
 // ==========================================
 // Payment Items Routes
@@ -97,31 +106,28 @@ router.get(
   fetchRolesAndPermissionsHandler,
 );
 
-// Get all users
 router.get(
   "/users",
-  validateUserQueryParams(getUserWithOptionalQueryParamsAndSearch),
   authenticateJWT,
-  requireManager,
-  getEveryUserHandler,
+  canReadAdmins,
+  validateRequest("query", listAdminsQuerySchema),
+  asyncHandler(listAdminsHandler),
 );
 
-// Create a new user
 router.post(
   "/users",
   authenticateJWT,
-  requireManager,
-  validate(createUserValidationSchema),
-  createNewUserHandler,
+  canCreateAdmins,
+  validateRequest("body", createAdminSchema),
+  asyncHandler(createAdminHandler),
 );
 
-// Assign role
 router.post(
   "/users/roles/assign",
   authenticateJWT,
-  requireManager,
-  validate(roleActionSchema),
-  assignRoleToUserHandler,
+  canUpdateAdmins,
+  validateRequest("body", roleAssignmentSchema),
+  asyncHandler(assignRoleHandler),
 );
 
 // Password rotation
@@ -141,50 +147,55 @@ router.post(
   changeAnyUserPasswordHandler,
 );
 
-// Get user by ID
 router.get(
   "/users/:id",
   authenticateJWT,
-  requireManager,
-  validateUserParams(getUserValidationByUuidSchema),
-  getUserByIdHandler,
+  canReadAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  asyncHandler(getAdminHandler),
 );
 
-// Update user
 router.patch(
   "/users/:id",
   authenticateJWT,
-  requireManager,
-  validateUserParams(getUserValidationByUuidSchema), //validating for userid
-  validate(updateUserValidationSchema), // validating for req.body
-  updateExistingUserHandler,
+  canUpdateAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  validateRequest("body", updateAdminSchema),
+  asyncHandler(updateAdminHandler),
 );
 
-// Delete user
 router.delete(
   "/users/:id",
   authenticateJWT,
-  requireManager,
-  validateUserParams(getUserValidationByUuidSchema),
-  deleteAUserHandler,
+  canDeleteAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  asyncHandler(deleteAdminHandler),
 );
 
-// Block user
+router.patch(
+  "/users/:id/status",
+  authenticateJWT,
+  canUpdateAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  validateRequest("body", updateAdminStatusSchema),
+  asyncHandler(updateAdminStatusHandler),
+);
+
 router.post(
   "/users/:id/block",
   authenticateJWT,
-  requireManager,
-  validateUserParams(getUserValidationByUuidSchema),
-  validate(blockUserValidationSchema),
-  blockExistingUserHandler,
+  canUpdateAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  validateRequest("body", blockUserValidationSchema),
+  asyncHandler(blockAdminHandler),
 );
 
-// Unblock user
 router.patch(
   "/users/:id/unblock",
   authenticateJWT,
-  requireManager,
-  unblockExistingUserHandler,
+  canUpdateAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  asyncHandler(unblockAdminHandler),
 );
 
 export default router;

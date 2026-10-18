@@ -1,5 +1,4 @@
 import prisma from "../config/database";
-import { userHasRoleData } from "../interfaces/userRole.interfaces";
 import ApiError from "../utils/apiError";
 
 export class UserRoleModel {
@@ -113,51 +112,4 @@ static async getBusinessIdByUserId(
   }
 }
 
-  static async getUserIdByBusinessId(businessId: number) {
-    try {
-      const userRole = await prisma.userHasRole.findFirst({
-        where: { businessId },
-        select: {
-          userId: true,
-        },
-      });
-
-      if (!userRole) {
-        throw new ApiError(404, "This user does not exist");
-      }
-
-      return userRole.userId;
-    } catch (error) {
-      throw new ApiError(500, "Failed to get user id");
-    }
-  }
-
-  static async assignSubsequentUserRole(userRoleData: userHasRoleData) {
-    //convert received argument to array for flatmap ease
-    let userHasRoleDataArray: userHasRoleData[] = [];
-    userHasRoleDataArray.push(userRoleData);
-
-    try {
-      await prisma.userHasRole.createMany({
-        data: userHasRoleDataArray.flatMap((userHasRoleData) => {
-          return userHasRoleData.userRoleId.map((roleId) => ({
-            userId: userHasRoleData.userId,
-            roleId: roleId,
-            businessId: userHasRoleData.businessId,
-          }));
-        }),
-      });
-    } catch (error) {
-      throw new ApiError(500, "Failed to assign role to user");
-    }
-  }
-
-  static async unassignSubsequentUserRole(userId: string): Promise<void> {
-    await prisma.userHasRole.updateMany({
-      where: { userId: userId },
-      data: {
-        roleId: null,
-      },
-    });
-  }
 }

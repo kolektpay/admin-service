@@ -1,13 +1,14 @@
 import dotenv from "dotenv";
+
+import { CreatePaymentItemWalletResponse } from "../interfaces/paymentItem.interface";
+import { PaymentItemData } from "../interfaces/paymentitemwalletcreationdatainterface";
+import { TransactionData } from "../interfaces/transactions.interfaces";
 import {
   GeneratePaymentLinkRequestBody,
   GetAllPaymentLinksParamsBody,
 } from "../interfaces/wallet.interfaces";
-import { PaymentItemData } from "../interfaces/paymentitemwalletcreationdatainterface";
-import { CreatePaymentItemWalletResponse } from "../interfaces/paymentItem.interface";
 import { BaseProvider} from "../providers/base.provider";
 import { PaymentServiceEndpoints } from "../providers/paymentservice.endpoints";
-import { TransactionData } from "../interfaces/transactions.interfaces";
 dotenv.config();
 
 const api_key = process.env.API_KEY;

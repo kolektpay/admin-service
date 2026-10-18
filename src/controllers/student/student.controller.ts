@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
-import { successResponse } from "../../utils/response.util";
-import { extractRequestMetadata } from "../../utils/request.metadata";
+
+import {
+  StudentActor,
+  StudentStatusChangeResult,
+} from "../../interfaces/student.interfaces";
 import {
   blockStudent,
   bulkCreateStudents,
@@ -9,10 +12,8 @@ import {
   unblockStudent,
   updateStudentById,
 } from "../../services/student.service";
-import {
-  StudentActor,
-  StudentStatusChangeResult,
-} from "../../interfaces/student.interfaces";
+import { extractRequestMetadata } from "../../utils/request.metadata";
+import { successResponse } from "../../utils/response.util";
 import { ListStudentsQuery } from "../../validations/studentManagement.schema";
 
 // Business and actor come from the JWT (requirePermission guarantees both are present)

@@ -20,7 +20,7 @@ import prismaClient from "../../src/config/database";
 import { AuditModel } from "../../src/models/audit.model";
 import { createStudentWallet } from "../../src/thirdPartyService/wallet.services";
 import { AppError } from "../../src/middleware/error.middleware";
-import { bulkCreateStudents } from "../../src/services/studentservice.service";
+import { bulkCreateStudents } from "../../src/services/student.service";
 import {
   BulkStudentRecord,
   bulkStudentRecordSchema,

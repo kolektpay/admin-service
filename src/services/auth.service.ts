@@ -1,14 +1,13 @@
 import bcrypt from "bcrypt";
-import TokenManager from "../managers/token.manager";
 
-import { IUserResponse } from "../interfaces/user.interface";
-import { isPastDate } from "../helpers/date.helper";
 import { config } from "../config/app";
-import { AuditModel } from "../models/audit.model";
-import { UserModel } from "../models/user.model";
-import { NotificationModel } from "../models/notifications.model";
-
 import prisma from "../config/database";
+import { isPastDate } from "../helpers/date.helper";
+import { IUserResponse } from "../interfaces/user.interface";
+import TokenManager from "../managers/token.manager";
+import { AuditModel } from "../models/audit.model";
+import { NotificationModel } from "../models/notifications.model";
+import { UserModel } from "../models/user.model";
 import ApiError from "../utils/apiError";
 
 let support_email = config.supportEmail;

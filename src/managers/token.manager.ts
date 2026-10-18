@@ -1,15 +1,11 @@
+import { UserTokens } from "@prisma/client";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
-import {
-  KolektSuperAdminTokenPayload,
-  TokenPair,
-  TokenPayload,
-} from "../interfaces/auth.interface";
 
-import { UserTokens } from "@prisma/client";
 import prisma from "../config/database";
-import ApiError from "../utils/apiError";
+import { TokenPair, TokenPayload } from "../interfaces/auth.interface";
 import { UserRoleModel } from "../models/userHasRole.model";
+import ApiError from "../utils/apiError";
 
 // ──────────────────────────────────────────────────────────────
 // Force secrets to be defined (will crash early if missing – good!)
@@ -95,259 +91,35 @@ class TokenManager {
     const accessTokenId = uuidv4();
     const refreshTokenId = uuidv4();
 
-    const isClientKolektSuperAdmin =
-      typeof userId === "string"
-        ? await prisma.userHasRole.findFirst({
-            where: {
-              userId,
-              role: {
-                name: "Kolekt-super-admin",
-              },
-            },
-            include: {
-              role: true,
-            },
-          })
-        : null;
-
     let accountRole: "student" | "guardian" | "user" | null = null;
     if (typeof userId !== "string") {
       accountRole = await this.resolveAccountRole(userId);
     }
 
-    if (!isClientKolektSuperAdmin) {
-      if (typeof userId === "string") {
-        const fetchedBusinessId = Number(
-          await UserRoleModel.getBusinessIdByUserId(
-            userId,
-            (accountRole = "user"),
-          ),
-        );
-
-        const accessPayload: TokenPayload = {
+    if (typeof userId === "string") {
+      const fetchedBusinessId = Number(
+        await UserRoleModel.getBusinessIdByUserId(
           userId,
-          tokenId: accessTokenId,
-          businessId: fetchedBusinessId,
-          type: "access",
-          role: "user",
-        };
-        const refreshPayload: TokenPayload = {
-          userId,
-          tokenId: refreshTokenId,
-          businessId: fetchedBusinessId,
-          type: "refresh",
-          role: "user",
-        };
+          (accountRole = "user"),
+        ),
+      );
 
-        this.revokeAllUserTokens(userId);
-
-        const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
-          expiresIn: JWT_EXPIRES_IN,
-        } as SignOptions);
-
-        const refreshToken = jwt.sign(refreshPayload, JWT_REFRESH_SECRET, {
-          expiresIn: REFRESH_EXPIRES_IN,
-        } as SignOptions);
-
-        const accessExpiresAt = this.calculateExpiryDate(JWT_EXPIRES_IN);
-        const refreshExpiresAt = this.calculateExpiryDate(REFRESH_EXPIRES_IN);
-
-        try {
-          await Promise.all([
-            prisma.userTokens.create({
-              data: {
-                tokenId: accessTokenId,
-                type: "access",
-                tokenExpiresAt: accessExpiresAt,
-                revoked: false,
-                userId,
-              },
-            }),
-            prisma.userTokens.create({
-              data: {
-                tokenId: refreshTokenId,
-                type: "refresh",
-                tokenExpiresAt: refreshExpiresAt,
-                revoked: false,
-                userId,
-              },
-            }),
-          ]);
-        } catch (error) {
-          console.log("error:" + error);
-        }
-
-        return {
-          accessToken,
-          refreshToken,
-          accessExpiresAt,
-          refreshExpiresAt,
-        };
-      } else if (accountRole === "student") {
-        const studentId = BigInt(userId);
-        const fetchedBusinessId = Number(
-          await UserRoleModel.getBusinessIdByUserId(studentId, accountRole),
-        );
-
-        if (!fetchedBusinessId) {
-          throw new ApiError(
-            404,
-            "No business exists for this user or student id",
-          );
-        }
-
-        const accessPayload: TokenPayload = {
-          studentId,
-          tokenId: accessTokenId,
-          businessId: fetchedBusinessId,
-          type: "access",
-          role: "student",
-        };
-        const refreshPayload: TokenPayload = {
-          studentId,
-          tokenId: refreshTokenId,
-          businessId: fetchedBusinessId,
-          type: "refresh",
-          role: "student",
-        };
-
-        this.revokeAllUserTokens(studentId, "student");
-
-        const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
-          expiresIn: JWT_EXPIRES_IN,
-        } as SignOptions);
-
-        const refreshToken = jwt.sign(refreshPayload, JWT_REFRESH_SECRET, {
-          expiresIn: REFRESH_EXPIRES_IN,
-        } as SignOptions);
-
-        const accessExpiresAt = this.calculateExpiryDate(JWT_EXPIRES_IN);
-        const refreshExpiresAt = this.calculateExpiryDate(REFRESH_EXPIRES_IN);
-
-        try {
-          await Promise.all([
-            prisma.userTokens.create({
-              data: {
-                tokenId: accessTokenId,
-                type: "access",
-                tokenExpiresAt: accessExpiresAt,
-                revoked: false,
-                studentId,
-              },
-            }),
-            prisma.userTokens.create({
-              data: {
-                tokenId: refreshTokenId,
-                type: "refresh",
-                tokenExpiresAt: refreshExpiresAt,
-                revoked: false,
-                studentId,
-              },
-            }),
-          ]);
-        } catch (error) {
-          console.log("error:" + error);
-        }
-
-        return {
-          accessToken,
-          refreshToken,
-          accessExpiresAt,
-          refreshExpiresAt,
-        };
-      } else {
-        const guardianId = BigInt(userId);
-
-        console.log("guardianId: " + guardianId);
-        const fetchedBusinessId = Number(
-          await UserRoleModel.getBusinessIdByUserId(guardianId, accountRole = "guardian"),
-        );
-
-        if (!fetchedBusinessId) {
-          throw new ApiError(
-            404,
-            "No business exists for this user or guardian id",
-          );
-        }
-
-        const accessPayload: TokenPayload = {
-          guardianId,
-          tokenId: accessTokenId,
-          businessId: fetchedBusinessId,
-          type: "access",
-          role: "guardian",
-        };
-        const refreshPayload: TokenPayload = {
-          guardianId,
-          tokenId: refreshTokenId,
-          businessId: fetchedBusinessId,
-          type: "refresh",
-          role: "guardian",
-        };
-
-        this.revokeAllUserTokens(guardianId, "guardian");
-
-        const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
-          expiresIn: JWT_EXPIRES_IN,
-        } as SignOptions);
-
-        const refreshToken = jwt.sign(refreshPayload, JWT_REFRESH_SECRET, {
-          expiresIn: REFRESH_EXPIRES_IN,
-        } as SignOptions);
-
-        const accessExpiresAt = this.calculateExpiryDate(JWT_EXPIRES_IN);
-        const refreshExpiresAt = this.calculateExpiryDate(REFRESH_EXPIRES_IN);
-
-        try {
-          await Promise.all([
-            prisma.userTokens.create({
-              data: {
-                tokenId: accessTokenId,
-                type: "access",
-                tokenExpiresAt: accessExpiresAt,
-                revoked: false,
-                guardianId,
-              },
-            }),
-            prisma.userTokens.create({
-              data: {
-                tokenId: refreshTokenId,
-                type: "refresh",
-                tokenExpiresAt: refreshExpiresAt,
-                revoked: false,
-                guardianId,
-              },
-            }),
-          ]);
-        } catch (error) {
-          console.log("error:" + error);
-        }
-
-        return {
-          accessToken,
-          refreshToken,
-          accessExpiresAt,
-          refreshExpiresAt,
-        };
-      }
-    } else {
-      // A Kolekt super admin is always a string-userId account (the check
-      // above only ever runs against the user branch), so this path is
-      // only reachable for that case.
-      const accessPayload: KolektSuperAdminTokenPayload = {
-        userId: userId as string,
+      const accessPayload: TokenPayload = {
+        userId,
         tokenId: accessTokenId,
+        businessId: fetchedBusinessId,
         type: "access",
-        role: "Kolekt-super-admin",
+        role: "user",
       };
-      const refreshPayload: KolektSuperAdminTokenPayload = {
-        userId: userId as string,
+      const refreshPayload: TokenPayload = {
+        userId,
         tokenId: refreshTokenId,
+        businessId: fetchedBusinessId,
         type: "refresh",
-        role: "Kolekt-super-admin",
+        role: "user",
       };
 
-      this.revokeAllUserTokens(userId as string);
+      this.revokeAllUserTokens(userId);
 
       const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
         expiresIn: JWT_EXPIRES_IN,
@@ -368,7 +140,7 @@ class TokenManager {
               type: "access",
               tokenExpiresAt: accessExpiresAt,
               revoked: false,
-              userId: userId as string,
+              userId,
             },
           }),
           prisma.userTokens.create({
@@ -377,7 +149,153 @@ class TokenManager {
               type: "refresh",
               tokenExpiresAt: refreshExpiresAt,
               revoked: false,
-              userId: userId as string,
+              userId,
+            },
+          }),
+        ]);
+      } catch (error) {
+        console.log("error:" + error);
+      }
+
+      return {
+        accessToken,
+        refreshToken,
+        accessExpiresAt,
+        refreshExpiresAt,
+      };
+    } else if (accountRole === "student") {
+      const studentId = BigInt(userId);
+      const fetchedBusinessId = Number(
+        await UserRoleModel.getBusinessIdByUserId(studentId, accountRole),
+      );
+
+      if (!fetchedBusinessId) {
+        throw new ApiError(
+          404,
+          "No business exists for this user or student id",
+        );
+      }
+
+      const accessPayload: TokenPayload = {
+        studentId,
+        tokenId: accessTokenId,
+        businessId: fetchedBusinessId,
+        type: "access",
+        role: "student",
+      };
+      const refreshPayload: TokenPayload = {
+        studentId,
+        tokenId: refreshTokenId,
+        businessId: fetchedBusinessId,
+        type: "refresh",
+        role: "student",
+      };
+
+      this.revokeAllUserTokens(studentId, "student");
+
+      const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
+        expiresIn: JWT_EXPIRES_IN,
+      } as SignOptions);
+
+      const refreshToken = jwt.sign(refreshPayload, JWT_REFRESH_SECRET, {
+        expiresIn: REFRESH_EXPIRES_IN,
+      } as SignOptions);
+
+      const accessExpiresAt = this.calculateExpiryDate(JWT_EXPIRES_IN);
+      const refreshExpiresAt = this.calculateExpiryDate(REFRESH_EXPIRES_IN);
+
+      try {
+        await Promise.all([
+          prisma.userTokens.create({
+            data: {
+              tokenId: accessTokenId,
+              type: "access",
+              tokenExpiresAt: accessExpiresAt,
+              revoked: false,
+              studentId,
+            },
+          }),
+          prisma.userTokens.create({
+            data: {
+              tokenId: refreshTokenId,
+              type: "refresh",
+              tokenExpiresAt: refreshExpiresAt,
+              revoked: false,
+              studentId,
+            },
+          }),
+        ]);
+      } catch (error) {
+        console.log("error:" + error);
+      }
+
+      return {
+        accessToken,
+        refreshToken,
+        accessExpiresAt,
+        refreshExpiresAt,
+      };
+    } else {
+      const guardianId = BigInt(userId);
+
+      console.log("guardianId: " + guardianId);
+      const fetchedBusinessId = Number(
+        await UserRoleModel.getBusinessIdByUserId(guardianId, accountRole = "guardian"),
+      );
+
+      if (!fetchedBusinessId) {
+        throw new ApiError(
+          404,
+          "No business exists for this user or guardian id",
+        );
+      }
+
+      const accessPayload: TokenPayload = {
+        guardianId,
+        tokenId: accessTokenId,
+        businessId: fetchedBusinessId,
+        type: "access",
+        role: "guardian",
+      };
+      const refreshPayload: TokenPayload = {
+        guardianId,
+        tokenId: refreshTokenId,
+        businessId: fetchedBusinessId,
+        type: "refresh",
+        role: "guardian",
+      };
+
+      this.revokeAllUserTokens(guardianId, "guardian");
+
+      const accessToken = jwt.sign(accessPayload, JWT_SECRET, {
+        expiresIn: JWT_EXPIRES_IN,
+      } as SignOptions);
+
+      const refreshToken = jwt.sign(refreshPayload, JWT_REFRESH_SECRET, {
+        expiresIn: REFRESH_EXPIRES_IN,
+      } as SignOptions);
+
+      const accessExpiresAt = this.calculateExpiryDate(JWT_EXPIRES_IN);
+      const refreshExpiresAt = this.calculateExpiryDate(REFRESH_EXPIRES_IN);
+
+      try {
+        await Promise.all([
+          prisma.userTokens.create({
+            data: {
+              tokenId: accessTokenId,
+              type: "access",
+              tokenExpiresAt: accessExpiresAt,
+              revoked: false,
+              guardianId,
+            },
+          }),
+          prisma.userTokens.create({
+            data: {
+              tokenId: refreshTokenId,
+              type: "refresh",
+              tokenExpiresAt: refreshExpiresAt,
+              revoked: false,
+              guardianId,
             },
           }),
         ]);

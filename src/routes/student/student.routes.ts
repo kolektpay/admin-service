@@ -1,3 +1,5 @@
+import { Router } from "express";
+
 import {
   blockStudentHandler,
   bulkCreateStudentsHandler,
@@ -8,6 +10,13 @@ import {
   updateStudentHandler,
 } from "../../controllers/student/student.controller";
 import {
+  authenticateJWT,
+  requirePermission,
+} from "../../middleware/auth.middleware";
+import { userActionThrottle } from "../../middleware/reqThrottle.middleware";
+import { validateRequest } from "../../middleware/validation.middleware";
+import { asyncHandler } from "../../utils/asyncHandler";
+import {
   blockStudentSchema,
   bulkCreateStudentsSchema,
   bulkStudentRecordSchema,
@@ -16,14 +25,6 @@ import {
   unblockStudentSchema,
   updateStudentSchema,
 } from "../../validations/studentManagement.schema";
-import { Router } from "express";
-import {
-  authenticateJWT,
-  requirePermission,
-} from "../../middleware/auth.middleware";
-import { validateRequest } from "../../middleware/validation.middleware";
-import { userActionThrottle } from "../../middleware/reqThrottle.middleware";
-import { asyncHandler } from "../../utils/asyncHandler";
 
 const router = Router();
 

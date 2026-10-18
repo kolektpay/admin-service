@@ -1,14 +1,15 @@
-import prisma from "../config/database";
-import ApiError from "../utils/apiError";
-import { getCurrentTimestamp } from "../helpers/date.helper";
 import bcrypt from "bcrypt";
-import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
-import { NotificationModel } from "../models/notifications.model";
+
+import prisma from "../config/database";
+import { getCurrentTimestamp } from "../helpers/date.helper";
 import {
   IGuardianFormData,
   IGuardianResponse,
   IGuardianResponseForAuth,
 } from "../interfaces/guardian.interfaces";
+import { TempPasswordTokenManager } from "../managers/tempPasswordTokenManager";
+import { NotificationModel } from "../models/notifications.model";
+import ApiError from "../utils/apiError";
 
 const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
 /**

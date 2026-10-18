@@ -2,23 +2,14 @@ import prisma from "../config/database";
 
 export const rolesHasPermissionSeeder = async () => {
   try {
-    const rolesHasPermissionCount = await prisma.roleHasPermission.count();
-
-    if (rolesHasPermissionCount > 0) {
-      console.log("User roles already seeded!");
-      return;
-    }
-
+    // No "already seeded" guard: skipDuplicates makes re-runs safe and lets
+    // newly added permissions reach existing roles.
     const roleIds = await prisma.role.findMany({
       select: { id: true, name: true },
     });
 
     const permissionIds = await prisma.permissions.findMany({
       select: { id: true, name: true, category: true },
-    });
-
-    const platformAdminPermission = await prisma.permissions.findUnique({
-      where: { name: "menu.platformadministration" },
     });
 
     // All permissions categorized as "admin" — not just student/guardian management
@@ -30,10 +21,6 @@ export const rolesHasPermissionSeeder = async () => {
       const assignedPermissions =
         role.name === "manager"
           ? permissionIds
-          : role.name === "Kolekt-super-admin"
-          ? platformAdminPermission
-            ? [platformAdminPermission]
-            : []
           : role.name === "admin"
           ? adminCategoryPermissions
           : permissionIds.slice(0, 5);

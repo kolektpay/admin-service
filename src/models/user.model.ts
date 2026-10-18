@@ -1,9 +1,56 @@
+import { Prisma } from "@prisma/client";
+
 import prisma from "../config/database";
 import {
   getCurrentTimestamp,
   getTimestampMinutesFromNow,
 } from "../helpers/date.helper";
-import { onBoardTrackerType } from "@prisma/client";
+
+/**
+ * Administrator fields that are safe to return. Password hashes, TOTP
+ * secrets, OTP data and tokens are deliberately excluded. The role is
+ * limited to the given business; an administrator holds at most one.
+ */
+export const adminPublicSelect = (businessId: bigint) =>
+  ({
+    id: true,
+    email: true,
+    firstName: true,
+    lastName: true,
+    phoneNumber: true,
+    status: true,
+    blockReason: true,
+    leaveReason: true,
+    expectedReturnDate: true,
+    mustChangePassword: true,
+    totpEnabled: true,
+    failedLoginCount: true,
+    lastLoggedInAt: true,
+    passwordExpiresAt: true,
+    createdAt: true,
+    updatedAt: true,
+    userHasRoles: {
+      where: { businessId, roleId: { not: null } },
+      select: { role: { select: { id: true, name: true } } },
+      take: 1,
+    },
+  }) satisfies Prisma.UsersSelect;
+
+type AdminRow = Prisma.UsersGetPayload<{
+  select: ReturnType<typeof adminPublicSelect>;
+}>;
+
+export type AdminPublicRecord = Omit<AdminRow, "userHasRoles"> & {
+  role: { id: bigint; name: string } | null;
+};
+
+export const toAdminRecord = ({
+  userHasRoles,
+  ...admin
+}: AdminRow): AdminPublicRecord => ({
+  ...admin,
+  role: userHasRoles[0]?.role ?? null,
+});
 
 export class UserModel {
   /**
@@ -139,41 +186,6 @@ export class UserModel {
         createdAt: getCurrentTimestamp(),
         status: "active",
         failedLoginCount: 0,
-      },
-    });
-  }
-
-  static async setOnboardStep(
-    userId: string,
-    stepper: onBoardTrackerType,
-  ): Promise<void> {
-    try {
-      await prisma.users.update({
-        where: { id: userId },
-        data: {
-          onBoardTracker: stepper,
-        },
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  }
-
-  static async unblockAccount(userId: string): Promise<void> {
-    await prisma.users.update({
-      where: { id: userId },
-      data: {
-        status: "active",
-        blockReason: null,
-      },
-    });
-  }
-
-  static async deleteUserAccount(userId: string): Promise<void> {
-    await prisma.users.update({
-      where: { id: userId },
-      data: {
-        deletedAt: getCurrentTimestamp(),
       },
     });
   }

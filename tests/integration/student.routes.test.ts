@@ -2,7 +2,7 @@ jest.mock("../../src/config/database", () => ({
   __esModule: true,
   default: require("../helpers/prismaMock").createPrismaMock(),
 }));
-jest.mock("../../src/utils/token.manager", () => ({
+jest.mock("../../src/managers/token.manager", () => ({
   __esModule: true,
   default: { verifyAccessToken: jest.fn() },
 }));
@@ -34,7 +34,7 @@ jest.mock("../../src/services/telegramLogger.service", () => ({
 import express from "express";
 import request from "supertest";
 import prismaClient from "../../src/config/database";
-import TokenManager from "../../src/utils/token.manager";
+import TokenManager from "../../src/managers/token.manager";
 import { incrementAndCheck } from "../../src/cache/throttleStore";
 import studentRouter from "../../src/routes/student/student.routes";
 import { errorHandler, notFoundHandler } from "../../src/middleware/error.middleware";

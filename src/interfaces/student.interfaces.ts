@@ -1,4 +1,5 @@
 import { StudentStatus } from "@prisma/client";
+
 import { BulkStudentRecord } from "../validations/studentManagement.schema";
 
 export interface IStudentFormData {

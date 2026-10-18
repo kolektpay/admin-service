@@ -16,31 +16,19 @@ export const userHasRoleSeeder = async () => {
       },
     });
 
-    const kolektSuperAdminRole = roles.find(
-      (role) => role.name === "Kolekt-super-admin"
-    );
-
     const usersInfo = await prisma.users.findMany({
       select: {
-        email: true,
         id: true,
       },
     });
 
     await prisma.userHasRole.createMany({
-      data: usersInfo.flatMap((userInfo) => {
-        const assignedRoles =
-          userInfo.email === "unachukwuuche49@gmail.com"
-            ? kolektSuperAdminRole
-              ? [kolektSuperAdminRole]
-              : []
-            : roles.slice(0, 1);
-
-        return assignedRoles.map((role) => ({
+      data: usersInfo.flatMap((userInfo) =>
+        roles.slice(0, 1).map((role) => ({
           userId: userInfo.id,
           roleId: role.id,
-        }));
-      }),
+        })),
+      ),
     });
 
     console.log("✅ User roles seeded successfully!");

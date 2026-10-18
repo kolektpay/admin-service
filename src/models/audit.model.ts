@@ -1,5 +1,7 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, UserStatus } from "@prisma/client";
+
 import prisma from "../config/database";
+import { AdminActor } from "../interfaces/admin.interfaces";
 
 type DbClient = Prisma.TransactionClient;
 
@@ -58,22 +60,6 @@ export class AuditModel {
   //log blocked student account
 
   /**
-   * Log unblocking account attempt
-   */
-  static async logUnblockedAccount(
-    userId: string,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "blocked",
-        status: "user_account_unblocked",
-      },
-    });
-  }
-  /**
    * Log view audit logs attempt
    */
   static async logAuditLogsViewed(
@@ -86,24 +72,6 @@ export class AuditModel {
         ipAddress,
         result: "success",
         status: "request_to_view_audit_logs",
-      },
-    });
-  }
-
-  /**
-   * Log assign role to user attempt
-   */
-
-  static async logAssignRoleToUser(
-    userId: string,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "request_to_assign_role_to_user",
       },
     });
   }
@@ -183,48 +151,6 @@ export class AuditModel {
         ipAddress,
         result: "success",
         status: "request_to_get_user_by_unique_id",
-      },
-    });
-  }
-
-  static async logCreatedNewUser(
-    userId: string,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "request_to_create_a_new_user",
-      },
-    });
-  }
-
-  static async logUpdateNewUser(
-    userId: string,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "request_to_update_existing_user_details",
-      },
-    });
-  }
-
-  static async logDeletedNewUser(
-    userId: string,
-    ipAddress: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "request_to_delete_an_existing_user",
       },
     });
   }
@@ -390,48 +316,6 @@ export class AuditModel {
         },
       });
     }
-  }
-
-  static async logNewManagerUserCreated(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "manager_creation_operation_was_successful",
-      },
-    });
-  }
-
-  static async logManagerBusinessCreated(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "manager_business_creation_operation_was_successful",
-      },
-    });
-  }
-
-  static async logManagerBusinessBankCreated(
-    userId: string,
-    ipAddress?: string | undefined,
-  ): Promise<void> {
-    await prisma.auditLogs.create({
-      data: {
-        userId,
-        ipAddress,
-        result: "success",
-        status: "manager_business_bank_creation_operation_was_successful",
-      },
-    });
   }
 
   /**
@@ -697,4 +581,139 @@ export class AuditModel {
       },
     });
   }
+
+  // ==========================================
+  // Administrator and role management.
+  // userId is the actor; the affected record is named in status.
+  // ==========================================
+
+  static async logAdminCreated(
+    actor: AdminActor,
+    adminId: string,
+    roleId: bigint,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: `admin_created: ${adminId} with role ${roleId}`,
+      },
+    });
+  }
+
+  static async logAdminUpdated(
+    actor: AdminActor,
+    adminId: string,
+    updatedFields: string[],
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: `admin_updated: ${adminId} (${updatedFields.join(", ")})`,
+      },
+    });
+  }
+
+  static async logAdminRoleChanged(
+    actor: AdminActor,
+    adminId: string,
+    roleId: bigint | null,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: roleId
+          ? `admin_role_assigned: ${adminId} to role ${roleId}`
+          : `admin_role_unassigned: ${adminId}`,
+      },
+    });
+  }
+
+  static async logAdminDeleted(
+    actor: AdminActor,
+    adminId: string,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: `admin_deleted: ${adminId}`,
+      },
+    });
+  }
+
+  static async logAdminStatusChanged(
+    actor: AdminActor,
+    adminId: string,
+    status: UserStatus,
+    reason: string | undefined,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: status === "blocked" ? "blocked" : "success",
+        status: `admin_status_changed: ${adminId} to ${status}${reason ? ` due to ${reason}` : ""}`,
+      },
+    });
+  }
+
+  static async logRoleCreated(
+    actor: AdminActor,
+    roleId: bigint,
+    roleName: string,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: `role_created: ${roleId} (${roleName})`,
+      },
+    });
+  }
+
+  static async logRoleDeleted(
+    actor: AdminActor,
+    roleId: bigint,
+    roleName: string,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: `role_deleted: ${roleId} (${roleName})`,
+      },
+    });
+  }
+
+  static async logRolePermissionsUpdated(
+    actor: AdminActor,
+    roleId: bigint,
+    roleName: string,
+    added: bigint[],
+    removed: bigint[],
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status: `role_permissions_updated: role ${roleId} (${roleName}), added [${added.join(", ")}], removed [${removed.join(", ")}]`,
+      },
+    });
+  }
 }
+
+const auditActor = (actor: AdminActor) => ({
+  userId: actor.userId,
+  businessId: actor.businessId,
+  ipAddress: actor.ip,
+});

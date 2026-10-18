@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { UserSchema } from "../../validations/userLogin.schema";
+
 import {
   authenticateRefreshTokenHandler,
   emailLiveCheckHandler,
@@ -9,23 +9,18 @@ import {
   loginHandler,
   logoutHandler,
   mustChangePasswordHandler,
-  otpVerifyHandler,
-  registerUserWithKolektSuperAdminHandler,
-  resendOtpHandler,
   resetPasswordHandler,
   setupTwoFactorHandler,
 } from "../../controllers/auth/user.auth/auth.controller";
+import { authenticateJWT } from "../../middleware/auth.middleware";
+import { requestThrottle } from "../../middleware/reqThrottle.middleware";
 import {
   validate,
   validateUserQueryParams,
 } from "../../middleware/validation.middleware";
-import { requestThrottle } from "../../middleware/reqThrottle.middleware";
-import {
-  authenticateJWT,
-  requireKolektSuperAdmin,
-} from "../../middleware/auth.middleware";
-import { passwordValidationSchema } from "../../validations/uservalidation.schema";
 import { liveEmailCheckSchema } from "../../validations/liveCheckEmail.schema";
+import { UserSchema } from "../../validations/userLogin.schema";
+import { passwordValidationSchema } from "../../validations/uservalidation.schema";
 
 
 const router = Router();
@@ -47,14 +42,6 @@ router.post(
   validate(passwordValidationSchema),
   mustChangePasswordHandler,
 );
-router.post("/verify-otp", requestThrottle(3, 10), otpVerifyHandler);
-router.post("/resend-otp", requestThrottle(3, 10), resendOtpHandler);
-router.post(
-  "/register",
-  authenticateJWT,
-  requireKolektSuperAdmin,
-  registerUserWithKolektSuperAdminHandler,
-); //only kolekt super admin should be able to access this
 router.get(
   "/live-email-check",
   validateUserQueryParams(liveEmailCheckSchema),

@@ -14,6 +14,8 @@ model UserHasRole {
   role       Role?   @relation(fields: [roleId], references: [id], onDelete: Cascade)
   user       Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([businessId, roleId])
   @@map("user_has_roles")
 }
 
@@ -25,7 +27,6 @@ model Users {
   createdAt           DateTime            @default(now()) @map("created_at")
   updatedAt           DateTime            @updatedAt @map("updated_at")
   emailVerifiedAt     DateTime?           @map("email_verified_at")
-  status              UserStatus          @default(inactive)
   id                  String              @id @default(uuid()) @db.Uuid
   phoneNumber         String?             @map("phone_number") @db.VarChar(15)
   lastLoggedInAt      DateTime?           @map("last_logged_in_at")
@@ -45,6 +46,9 @@ model Users {
   blockReason         String?             @map("block_reason")
   totpRequired        Boolean?            @default(true) @map("totp_required")
   deletedAt           DateTime?           @map("deleted_at")
+  expectedReturnDate  DateTime?           @map("expected_return_date") @db.Date
+  leaveReason         String?             @map("leave_reason")
+  status              UserStatus          @default(inactive)
   auditLogs           AuditLogs[]
   passwordHistories   PasswordHistory[]
   businesses          UserBusiness[]
@@ -182,6 +186,7 @@ model Businesses {
   type                             BusinessTypes?                  @relation(fields: [businessTypeId], references: [id], onDelete: Cascade)
   invoices                         Invoices[]
   paymentItems                     PaymentItems[]
+  roles                            Role[]
   student_guardian_has_permissions StudentGuardianHasPermissions[]
   students                         Students[]
   students_has_wallets             StudentsHasWallets[]
@@ -207,13 +212,16 @@ model Permissions {
 
 model Role {
   id           BigInt              @id @default(autoincrement())
-  name         String              @unique @db.VarChar(255)
+  name         String              @db.VarChar(255)
   createdAt    DateTime?           @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime?           @updatedAt @map("updated_at") @db.Timestamp(0)
   type         RoleType            @default(fixed)
+  businessId   BigInt?             @map("business_id")
   permissions  RoleHasPermission[]
+  business     Businesses?         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   userHasRoles UserHasRole[]
 
+  @@unique([businessId, name])
   @@map("roles")
 }
 
@@ -224,6 +232,7 @@ model RoleHasPermission {
   role         Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([permissionId, roleId])
+  @@index([roleId])
   @@map("role_has_permissions")
 }
 
@@ -421,17 +430,17 @@ model Receipts {
 }
 
 model StudentGuardianHasPermissions {
-  id            BigInt      @id @default(autoincrement())
-  student_id    BigInt?
-  guardian_id   BigInt?
-  permission_id BigInt
-  business_id   BigInt?
-  businesses    Businesses? @relation(fields: [business_id], references: [id])
-  guardians     Guardians?  @relation(fields: [guardian_id], references: [id])
-  permissions   Permissions @relation(fields: [permission_id], references: [id])
-  students      Students?   @relation(fields: [student_id], references: [id])
+  id           BigInt      @id @default(autoincrement())
+  studentId    BigInt?     @map("student_id")
+  guardianId   BigInt?     @map("guardian_id")
+  permissionId BigInt      @map("permission_id")
+  businessId   BigInt?     @map("business_id")
+  businesses   Businesses? @relation(fields: [businessId], references: [id])
+  guardians    Guardians?  @relation(fields: [guardianId], references: [id])
+  permissions  Permissions @relation(fields: [permissionId], references: [id])
+  students     Students?   @relation(fields: [studentId], references: [id])
 
-  @@unique([student_id, guardian_id, permission_id])
+  @@unique([studentId, guardianId, permissionId])
   @@map("student_guardian_has_permissions")
 }
 
@@ -454,6 +463,7 @@ enum UserStatus {
   suspended
   pending
   otp_verify
+  on_leave
 }
 
 enum AuditLoginResult {
