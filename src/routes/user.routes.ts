@@ -7,6 +7,7 @@ import {
   deleteAdminHandler,
   getAdminHandler,
   listAdminsHandler,
+  setAdminRolesHandler,
   unblockAdminHandler,
   updateAdminHandler,
   updateAdminStatusHandler,
@@ -36,6 +37,7 @@ import {
   createAdminSchema,
   listAdminsQuerySchema,
   roleAssignmentSchema,
+  setAdminRolesSchema,
   updateAdminSchema,
   updateAdminStatusSchema,
 } from "../validations/adminManagement.schema";
@@ -170,6 +172,15 @@ router.delete(
   canDeleteAdmins,
   validateRequest("params", adminIdParamsSchema),
   asyncHandler(deleteAdminHandler),
+);
+
+router.put(
+  "/users/:id/roles",
+  authenticateJWT,
+  canUpdateAdmins,
+  validateRequest("params", adminIdParamsSchema),
+  validateRequest("body", setAdminRolesSchema),
+  asyncHandler(setAdminRolesHandler),
 );
 
 router.patch(

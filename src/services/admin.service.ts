@@ -52,8 +52,7 @@ const emailTakenError = () =>
 interface ManagedAdmin {
   id: string;
   status: UserStatus;
-  roleId: bigint | null;
-  roleName: string | null;
+  roles: { id: bigint; name: string }[];
 }
 
 const findManagedAdmin = async (
@@ -68,18 +67,15 @@ const findManagedAdmin = async (
       userHasRoles: {
         where: { businessId, roleId: { not: null } },
         select: { role: { select: { id: true, name: true } } },
-        take: 1,
       },
     },
   });
   if (!admin) throw adminNotFoundError();
 
-  const role = admin.userHasRoles[0]?.role ?? null;
   return {
     id: admin.id,
     status: admin.status,
-    roleId: role?.id ?? null,
-    roleName: role?.name ?? null,
+    roles: admin.userHasRoles.flatMap(({ role }) => (role ? [role] : [])),
   };
 };
 
@@ -101,7 +97,7 @@ const assertCanManage = (
       "CANNOT_MANAGE_SELF",
     );
   }
-  if (!isSelf && target.roleName === MANAGER_ROLE_NAME) {
+  if (!isSelf && target.roles.some(({ name }) => name === MANAGER_ROLE_NAME)) {
     throw new AppError(
       "The business manager's account cannot be changed",
       403,
@@ -111,24 +107,29 @@ const assertCanManage = (
 };
 
 /**
- * Check that a role exists for the actor's business, is not the manager
- * role, and grants nothing the actor does not hold.
+ * Check that every role exists for the actor's business, none is the
+ * manager role, and together they grant nothing the actor does not hold.
  */
-const assertRoleAssignable = async (
-  roleId: bigint,
+const assertRolesAssignable = async (
+  roleIds: bigint[],
   actor: AdminActor,
 ): Promise<void> => {
-  const role = await prisma.role.findFirst({
-    where: { id: roleId, ...rolesVisibleTo(actor.businessId) },
-    select: { name: true, permissions: { select: { permissionId: true } } },
+  const roles = await prisma.role.findMany({
+    where: { id: { in: roleIds }, ...rolesVisibleTo(actor.businessId) },
+    select: { id: true, name: true, permissions: { select: { permissionId: true } } },
   });
 
-  if (!role) {
-    throw new AppError("Role not found", 400, "INVALID_ROLE", [
-      { field: "roleId", message: `Role ${roleId} does not exist` },
-    ]);
+  const foundIds = new Set(roles.map(({ id }) => id));
+  const missing = roleIds.filter((id) => !foundIds.has(id));
+  if (missing.length) {
+    throw new AppError(
+      "Role not found",
+      400,
+      "INVALID_ROLE",
+      missing.map((id) => ({ field: "roleIds", message: `Role ${id} does not exist` })),
+    );
   }
-  if (role.name === MANAGER_ROLE_NAME) {
+  if (roles.some(({ name }) => name === MANAGER_ROLE_NAME)) {
     throw new AppError(
       "The manager role cannot be assigned",
       403,
@@ -136,11 +137,31 @@ const assertRoleAssignable = async (
     );
   }
 
-  await assertActorHoldsPermissions(
-    actor,
-    role.permissions.map(({ permissionId }) => permissionId),
-    "roleId",
+  const grantedPermissionIds = new Set(
+    roles.flatMap(({ permissions }) => permissions.map(({ permissionId }) => permissionId)),
   );
+  await assertActorHoldsPermissions(actor, [...grantedPermissionIds], "roleIds");
+};
+
+/**
+ * Make the administrator hold exactly these roles in the business. With no
+ * roles left they keep a role-less assignment, since assignments are what
+ * place an administrator in a business.
+ */
+const replaceRoles = async (
+  tx: Prisma.TransactionClient,
+  adminId: string,
+  businessId: bigint,
+  roleIds: bigint[],
+): Promise<void> => {
+  await tx.userHasRole.deleteMany({ where: { userId: adminId, businessId } });
+  await tx.userHasRole.createMany({
+    data: (roleIds.length ? roleIds : [null]).map((roleId) => ({
+      userId: adminId,
+      roleId,
+      businessId,
+    })),
+  });
 };
 
 const assertEmailAvailable = async (email: string, exceptAdminId?: string) => {
@@ -310,17 +331,17 @@ export const getUserByUniqueId = async (
 // ==========================================
 
 /**
- * Create an administrator in the actor's business with exactly one role.
- * The account, its role, business link, password history, temporary
+ * Create an administrator in the actor's business with one or more roles.
+ * The account, its roles, business link, password history, temporary
  * password email and audit entry are written in one transaction.
  */
 export const createAdmin = async (
   input: CreateAdminInput,
   actor: AdminActor,
 ): Promise<AdminPublicRecord> => {
-  const { roleId, ...profile } = input;
+  const { roleIds, ...profile } = input;
 
-  await assertRoleAssignable(roleId, actor);
+  await assertRolesAssignable(roleIds, actor);
   await assertEmailAvailable(profile.email);
 
   const temporaryPassword = TempPasswordTokenManager.generateToken();
@@ -337,7 +358,11 @@ export const createAdmin = async (
           passwordExpiresAt: addDays(now, PASSWORD_LIFETIME_DAYS),
           mustChangePassword: true,
           createdBy: actor.userId,
-          userHasRoles: { create: { roleId, businessId: actor.businessId } },
+          userHasRoles: {
+            createMany: {
+              data: roleIds.map((roleId) => ({ roleId, businessId: actor.businessId })),
+            },
+          },
           businesses: { create: { businessId: actor.businessId } },
           passwordHistories: {
             create: { password: hashedPassword, passwordstatus: "password-change" },
@@ -355,7 +380,7 @@ export const createAdmin = async (
           resetLink: `${process.env.MUST_CHANGE_PASSWORD_LINK_URL}/change-password?email=${admin.email}`,
         }),
       });
-      await AuditModel.logAdminCreated(actor, admin.id, roleId, tx);
+      await AuditModel.logAdminCreated(actor, admin.id, roleIds, tx);
 
       return toAdminRecord(admin);
     });
@@ -367,44 +392,41 @@ export const createAdmin = async (
 };
 
 /**
- * Update an administrator's details and/or role. A new role replaces the
- * previous one. Staff may edit their own details but not their own role.
+ * Apply detail and/or role changes to a looked-up administrator. roleIds is
+ * the complete set they should hold. Staff may edit their own details but
+ * not their own roles. Only newly added roles go through the assignability
+ * checks, so an actor can still remove a role that grants more than they hold.
  */
-export const updateAdmin = async (
-  adminId: string,
+const applyAdminUpdate = async (
+  target: ManagedAdmin,
   input: UpdateAdminInput,
   actor: AdminActor,
 ): Promise<AdminPublicRecord> => {
-  const { roleId, ...profile } = input;
-  const target = await findManagedAdmin(adminId, actor.businessId);
-  const roleChanges = roleId !== undefined && roleId !== target.roleId;
+  const { roleIds, ...profile } = input;
+  const adminId = target.id;
 
-  assertCanManage(target, actor, { allowSelf: !roleChanges });
+  const currentIds = target.roles.map(({ id }) => id);
+  const added = roleIds?.filter((id) => !currentIds.includes(id)) ?? [];
+  const removed = roleIds ? currentIds.filter((id) => !roleIds.includes(id)) : [];
+  const rolesChange = added.length > 0 || removed.length > 0;
 
-  if (roleChanges) await assertRoleAssignable(roleId, actor);
+  assertCanManage(target, actor, { allowSelf: !rolesChange });
+
+  if (added.length) await assertRolesAssignable(added, actor);
   if (profile.email) await assertEmailAvailable(profile.email, adminId);
 
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.users.update({
-        where: { id: adminId, deletedAt: null },
-        data: {
-          ...profile,
-          ...(roleChanges && {
-            userHasRoles: {
-              deleteMany: { businessId: actor.businessId },
-              create: { roleId, businessId: actor.businessId },
-            },
-          }),
-        },
-      });
+      // Also runs with no detail changes, so a concurrent delete surfaces as a 404
+      await tx.users.update({ where: { id: adminId, deletedAt: null }, data: profile });
+      if (rolesChange) await replaceRoles(tx, adminId, actor.businessId, roleIds!);
 
       const updatedFields = Object.keys(profile);
       if (updatedFields.length) {
         await AuditModel.logAdminUpdated(actor, adminId, updatedFields, tx);
       }
-      if (roleChanges) {
-        await AuditModel.logAdminRoleChanged(actor, adminId, roleId, tx);
+      if (rolesChange) {
+        await AuditModel.logAdminRolesChanged(actor, adminId, added, removed, tx);
       }
 
       return getAdminRecord(tx, adminId, actor.businessId);
@@ -415,26 +437,41 @@ export const updateAdmin = async (
   }
 };
 
-/**
- * Remove an administrator's role in the actor's business, keeping them
- * in the business without one (used by the legacy assign/unassign endpoint).
- */
-export const unassignAdminRole = async (
+/** Update an administrator's details and/or replace their set of roles. */
+export const updateAdmin = async (
   adminId: string,
+  input: UpdateAdminInput,
   actor: AdminActor,
-): Promise<void> => {
+): Promise<AdminPublicRecord> =>
+  applyAdminUpdate(await findManagedAdmin(adminId, actor.businessId), input, actor);
+
+/** Add roles to the ones an administrator already holds (legacy "assign"). */
+export const assignAdminRoles = async (
+  adminId: string,
+  roleIds: bigint[],
+  actor: AdminActor,
+): Promise<AdminPublicRecord> => {
   const target = await findManagedAdmin(adminId, actor.businessId);
-  assertCanManage(target, actor, { allowSelf: false });
+  const currentIds = target.roles.map(({ id }) => id);
 
-  if (target.roleId === null) return;
+  return applyAdminUpdate(target, { roleIds: [...new Set([...currentIds, ...roleIds])] }, actor);
+};
 
-  await prisma.$transaction(async (tx) => {
-    await tx.userHasRole.updateMany({
-      where: { userId: adminId, businessId: actor.businessId },
-      data: { roleId: null },
-    });
-    await AuditModel.logAdminRoleChanged(actor, adminId, null, tx);
-  });
+/**
+ * Remove the given roles from an administrator, or all of them when none
+ * are given, keeping them in the business (legacy "unassign").
+ */
+export const unassignAdminRoles = async (
+  adminId: string,
+  roleIds: bigint[] | undefined,
+  actor: AdminActor,
+): Promise<AdminPublicRecord> => {
+  const target = await findManagedAdmin(adminId, actor.businessId);
+  const remaining = roleIds
+    ? target.roles.map(({ id }) => id).filter((id) => !roleIds.includes(id))
+    : [];
+
+  return applyAdminUpdate(target, { roleIds: remaining }, actor);
 };
 
 /**
@@ -469,7 +506,7 @@ export const deleteAdmin = async (
 // Leave can be granted to active staff, or updated while already on leave
 const LEAVE_ELIGIBLE_STATUSES: UserStatus[] = ["active", "on_leave"];
 // Statuses an administrator is brought back from by unblocking
-const REACTIVATABLE_STATUSES: UserStatus[] = ["blocked", "on_leave"];
+const REACTIVATABLE_STATUSES: UserStatus[] = ["blocked", "blocked_by_admin", "on_leave"];
 
 export interface AdminStatusChangeResult {
   admin: AdminPublicRecord;
@@ -479,7 +516,10 @@ export interface AdminStatusChangeResult {
 /**
  * Block an administrator or place them on leave. Either way their
  * sessions are revoked, and login is refused until they are reactivated.
- * Blocking an already blocked administrator is a no-op.
+ * A block is stored as blocked_by_admin, which (unlike an automatic
+ * "blocked") a password reset cannot clear. Blocking an administrator
+ * already blocked by an admin is a no-op; one blocked automatically is
+ * upgraded to an admin block.
  */
 export const updateAdminStatus = async (
   adminId: string,
@@ -492,11 +532,11 @@ export const updateAdminStatus = async (
   let data: Prisma.UsersUpdateManyMutationInput;
 
   if (input.status === "blocked") {
-    if (target.status === "blocked") {
+    if (target.status === "blocked_by_admin") {
       return { admin: await getAdminById(adminId, actor.businessId), changed: false };
     }
     data = {
-      status: "blocked",
+      status: "blocked_by_admin",
       blockReason: input.reason ?? null,
       leaveReason: null,
       expectedReturnDate: null,
@@ -520,7 +560,7 @@ export const updateAdminStatus = async (
   const admin = await prisma.$transaction(async (tx) => {
     await applyStatusChange(tx, adminId, target.status, data);
     await revokeTokens(tx, adminId);
-    await AuditModel.logAdminStatusChanged(actor, adminId, input.status, input.reason, tx);
+    await AuditModel.logAdminStatusChanged(actor, adminId, data.status as UserStatus, input.reason, tx);
     return getAdminRecord(tx, adminId, actor.businessId);
   });
 

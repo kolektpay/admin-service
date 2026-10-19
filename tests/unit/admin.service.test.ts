@@ -13,11 +13,13 @@ jest.mock("bcrypt", () => ({
 import prismaClient from "../../src/config/database";
 import { AppError } from "../../src/middleware/error.middleware";
 import {
+  assignAdminRoles,
   createAdmin,
   deleteAdmin,
   getAdminById,
   listAdmins,
   reactivateAdmin,
+  unassignAdminRoles,
   updateAdmin,
   updateAdminStatus,
 } from "../../src/services/admin.service";
@@ -31,6 +33,15 @@ const ADMIN_ID = "321d02df-abcf-4ca7-a53d-75c2858633c0";
 const actor = { userId: "staff-1", businessId: BUSINESS_ID, ip: "127.0.0.1" };
 
 const bursar = { id: BigInt(7), name: "Bursar" };
+const cashier = { id: BigInt(8), name: "Cashier" };
+
+type CatalogRole = { id: bigint; name: string; permissions: { permissionId: bigint }[] };
+
+/** Roles visible to the business. The actor holds permission 61 only. */
+const catalogRole = (role: { id: bigint; name: string }, ...permissionIds: number[]): CatalogRole => ({
+  ...role,
+  permissions: permissionIds.map((id) => ({ permissionId: BigInt(id) })),
+});
 
 /** A row as selected by adminPublicSelect. */
 const adminRow = (overrides: Record<string, unknown> = {}) => ({
@@ -55,10 +66,10 @@ const adminRow = (overrides: Record<string, unknown> = {}) => ({
 });
 
 /** The administrator being managed, as read by the service's lookup. */
-const target = (status = "active", role: { id: bigint; name: string } | null = bursar) => ({
+const target = (status = "active", ...roles: { id: bigint; name: string }[]) => ({
   id: ADMIN_ID,
   status,
-  userHasRoles: role ? [{ role }] : [],
+  userHasRoles: (roles.length ? roles : [bursar]).map((role) => ({ role })),
 });
 
 const expectAppError = async (promise: Promise<unknown>, statusCode: number, code: string) => {
@@ -67,23 +78,34 @@ const expectAppError = async (promise: Promise<unknown>, statusCode: number, cod
 };
 
 let emailOwner: { id: string } | null;
-let managedAdmin: ReturnType<typeof target> | null;
+let managedAdmin: ReturnType<typeof target> | { id: string; status: string; userHasRoles: unknown[] } | null;
+let roleCatalog: CatalogRole[];
 
 beforeEach(() => {
   emailOwner = null;
   managedAdmin = target();
+  roleCatalog = [catalogRole(bursar, 61), catalogRole(cashier, 61)];
   // The same query serves the administrator lookup and the email uniqueness check
   prisma.users.findFirst.mockImplementation(async ({ where }: { where: { email?: string } }) =>
     where.email ? emailOwner : managedAdmin,
   );
   prisma.users.findUniqueOrThrow.mockResolvedValue(adminRow());
   prisma.users.updateMany.mockResolvedValue({ count: 1 });
-  prisma.role.findFirst.mockResolvedValue({
-    name: "Bursar",
-    permissions: [{ permissionId: BigInt(61) }],
-  });
+  prisma.role.findMany.mockImplementation(
+    async ({ where }: { where: { id: { in: bigint[] } } }) =>
+      roleCatalog.filter(({ id }) => where.id.in.includes(id)),
+  );
   prisma.roleHasPermission.findMany.mockResolvedValue([{ permissionId: BigInt(61) }]);
 });
+
+const expectRolesReplacedWith = (...roleIds: (bigint | null)[]) => {
+  expect(prisma.userHasRole.deleteMany).toHaveBeenCalledWith({
+    where: { userId: ADMIN_ID, businessId: BUSINESS_ID },
+  });
+  expect(prisma.userHasRole.createMany).toHaveBeenCalledWith({
+    data: roleIds.map((roleId) => ({ userId: ADMIN_ID, roleId, businessId: BUSINESS_ID })),
+  });
+};
 
 describe("listAdmins", () => {
   it("scopes to the business, combines filters and adds each admin's role", async () => {
@@ -121,10 +143,14 @@ describe("listAdmins", () => {
 });
 
 describe("getAdminById", () => {
-  it("returns the admin with their role", async () => {
-    managedAdmin = adminRow() as never;
+  it("returns the admin with all their roles", async () => {
+    managedAdmin = adminRow({ userHasRoles: [{ role: bursar }, { role: cashier }] }) as never;
 
-    await expect(getAdminById(ADMIN_ID, BUSINESS_ID)).resolves.toMatchObject({ id: ADMIN_ID, role: bursar });
+    await expect(getAdminById(ADMIN_ID, BUSINESS_ID)).resolves.toMatchObject({
+      id: ADMIN_ID,
+      roles: [bursar, cashier],
+      role: bursar,
+    });
     const args = prisma.users.findFirst.mock.calls[0][0];
     expect(args.where).toEqual({ id: ADMIN_ID, deletedAt: null, userHasRoles: { some: { businessId: BUSINESS_ID } } });
     expect(args.select.password).toBeUndefined();
@@ -142,14 +168,16 @@ describe("createAdmin", () => {
     email: "jane.smith@example.com",
     firstName: "jane",
     lastName: "smith",
-    roleId: BigInt(7),
+    roleIds: [BigInt(7), BigInt(8)],
   };
 
   beforeEach(() => {
-    prisma.users.create.mockResolvedValue(adminRow());
+    prisma.users.create.mockResolvedValue(
+      adminRow({ userHasRoles: [{ role: bursar }, { role: cashier }] }),
+    );
   });
 
-  it("creates the account, role, business link, password history and email in one transaction", async () => {
+  it("creates the account, roles, business link, password history and email in one transaction", async () => {
     const admin = await createAdmin(input, actor);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -161,44 +189,60 @@ describe("createAdmin", () => {
       password: expect.stringMatching(/^hashed:/),
       mustChangePassword: true,
       createdBy: "staff-1",
-      userHasRoles: { create: { roleId: BigInt(7), businessId: BUSINESS_ID } },
+      userHasRoles: {
+        createMany: {
+          data: [
+            { roleId: BigInt(7), businessId: BUSINESS_ID },
+            { roleId: BigInt(8), businessId: BUSINESS_ID },
+          ],
+        },
+      },
       businesses: { create: { businessId: BUSINESS_ID } },
       passwordHistories: { create: { password: data.password, passwordstatus: "password-change" } },
     });
-    expect(data).not.toHaveProperty("roleId");
+    expect(data).not.toHaveProperty("roleIds");
     expect(select.password).toBeUndefined();
     expect(prisma.notifications.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ toRecipientAddress: "jane.smith@example.com", type: "change_password_email" }),
     });
     expect(prisma.auditLogs.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ status: `admin_created: ${ADMIN_ID} with role 7` }),
+      data: expect.objectContaining({ status: `admin_created: ${ADMIN_ID} with roles [7, 8]` }),
     });
-    expect(admin).toMatchObject({ id: ADMIN_ID, role: bursar });
+    expect(admin).toMatchObject({ id: ADMIN_ID, roles: [bursar, cashier] });
     expect(admin).not.toHaveProperty("password");
   });
 
-  it("rejects a role that does not exist for the business", async () => {
-    prisma.role.findFirst.mockResolvedValue(null);
+  it("rejects roles that do not exist for the business, naming each one", async () => {
+    roleCatalog = [catalogRole(bursar, 61)];
 
-    await expectAppError(createAdmin(input, actor), 400, "INVALID_ROLE");
-    expect(prisma.role.findFirst.mock.calls[0][0].where).toEqual({
-      id: BigInt(7),
+    const promise = createAdmin({ ...input, roleIds: [BigInt(7), BigInt(8), BigInt(30)] }, actor);
+
+    await expectAppError(promise, 400, "INVALID_ROLE");
+    await expect(promise).rejects.toMatchObject({
+      details: [
+        { field: "roleIds", message: "Role 8 does not exist" },
+        { field: "roleIds", message: "Role 30 does not exist" },
+      ],
+    });
+    expect(prisma.role.findMany.mock.calls[0][0].where).toEqual({
+      id: { in: [BigInt(7), BigInt(8), BigInt(30)] },
       OR: [{ businessId: null }, { businessId: BUSINESS_ID }],
     });
     expect(prisma.users.create).not.toHaveBeenCalled();
   });
 
-  it("refuses to assign the manager role", async () => {
-    prisma.role.findFirst.mockResolvedValue({ name: "manager", permissions: [] });
+  it("refuses to assign the manager role, even alongside others", async () => {
+    roleCatalog.push(catalogRole({ id: BigInt(2), name: "manager" }));
 
-    await expectAppError(createAdmin(input, actor), 403, "MANAGER_ROLE_NOT_ASSIGNABLE");
+    await expectAppError(
+      createAdmin({ ...input, roleIds: [BigInt(7), BigInt(2)] }, actor),
+      403,
+      "MANAGER_ROLE_NOT_ASSIGNABLE",
+    );
   });
 
-  it("refuses a role granting permissions the actor does not hold", async () => {
-    prisma.role.findFirst.mockResolvedValue({
-      name: "Bursar",
-      permissions: [{ permissionId: BigInt(61) }, { permissionId: BigInt(99) }],
-    });
+  it("refuses roles that together grant a permission the actor does not hold", async () => {
+    roleCatalog = [catalogRole(bursar, 61), catalogRole(cashier, 99)];
 
     await expectAppError(createAdmin(input, actor), 403, "PERMISSION_ESCALATION");
   });
@@ -218,41 +262,63 @@ describe("createAdmin", () => {
 });
 
 describe("updateAdmin", () => {
-  it("replaces the previous role with the new one", async () => {
-    prisma.role.findFirst.mockResolvedValue({ name: "Cashier", permissions: [] });
-
-    await updateAdmin(ADMIN_ID, { roleId: BigInt(8) }, actor);
+  it("replaces the role set, checking and auditing only what changed", async () => {
+    await updateAdmin(ADMIN_ID, { roleIds: [BigInt(8)] }, actor);
 
     expect(prisma.users.update).toHaveBeenCalledWith({
       where: { id: ADMIN_ID, deletedAt: null },
-      data: {
-        userHasRoles: {
-          deleteMany: { businessId: BUSINESS_ID },
-          create: { roleId: BigInt(8), businessId: BUSINESS_ID },
-        },
-      },
+      data: {},
     });
+    expect(prisma.role.findMany.mock.calls[0][0].where.id).toEqual({ in: [BigInt(8)] });
+    expectRolesReplacedWith(BigInt(8));
     expect(prisma.auditLogs.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ status: `admin_role_assigned: ${ADMIN_ID} to role 8` }),
+      data: expect.objectContaining({
+        status: `admin_roles_changed: ${ADMIN_ID}, added [8], removed [7]`,
+      }),
     });
   });
 
-  it("leaves the role alone when it is unchanged", async () => {
-    await updateAdmin(ADMIN_ID, { firstName: "janet", roleId: BigInt(7) }, actor);
+  it("adds a role while keeping the existing one", async () => {
+    await updateAdmin(ADMIN_ID, { roleIds: [BigInt(7), BigInt(8)] }, actor);
 
-    expect(prisma.role.findFirst).not.toHaveBeenCalled();
+    expectRolesReplacedWith(BigInt(7), BigInt(8));
+    expect(prisma.auditLogs.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: `admin_roles_changed: ${ADMIN_ID}, added [8], removed []` }),
+    });
+  });
+
+  it("removes a role without checking it, even one granting more than the actor holds", async () => {
+    managedAdmin = target("active", bursar, { id: BigInt(9), name: "Auditor" });
+
+    await updateAdmin(ADMIN_ID, { roleIds: [BigInt(7)] }, actor);
+
+    expect(prisma.role.findMany).not.toHaveBeenCalled();
+    expectRolesReplacedWith(BigInt(7));
+  });
+
+  it("leaves the roles alone when the set is unchanged", async () => {
+    managedAdmin = target("active", bursar, cashier);
+
+    await updateAdmin(ADMIN_ID, { firstName: "janet", roleIds: [BigInt(8), BigInt(7)] }, actor);
+
+    expect(prisma.role.findMany).not.toHaveBeenCalled();
+    expect(prisma.userHasRole.deleteMany).not.toHaveBeenCalled();
     expect(prisma.users.update.mock.calls[0][0].data).toEqual({ firstName: "janet" });
   });
 
-  it("lets staff edit their own details but not their own role", async () => {
+  it("lets staff edit their own details but not their own roles", async () => {
     managedAdmin = { ...target(), id: actor.userId };
 
     await expect(updateAdmin(actor.userId, { firstName: "me" }, actor)).resolves.toBeDefined();
-    await expectAppError(updateAdmin(actor.userId, { roleId: BigInt(8) }, actor), 403, "CANNOT_MANAGE_SELF");
+    await expectAppError(
+      updateAdmin(actor.userId, { roleIds: [BigInt(7), BigInt(8)] }, actor),
+      403,
+      "CANNOT_MANAGE_SELF",
+    );
   });
 
-  it("protects the business manager's account", async () => {
-    managedAdmin = target("active", { id: BigInt(2), name: "manager" });
+  it("protects the business manager's account, whatever other roles they hold", async () => {
+    managedAdmin = target("active", bursar, { id: BigInt(2), name: "manager" });
 
     await expectAppError(updateAdmin(ADMIN_ID, { firstName: "x" }, actor), 403, "MANAGER_PROTECTED");
   });
@@ -264,6 +330,34 @@ describe("updateAdmin", () => {
     expect(prisma.users.findFirst).toHaveBeenCalledWith({
       where: { email: "taken@example.com", id: { not: ADMIN_ID } },
       select: { id: true },
+    });
+  });
+});
+
+describe("assignAdminRoles / unassignAdminRoles", () => {
+  it("assign adds to the roles already held", async () => {
+    await assignAdminRoles(ADMIN_ID, [BigInt(8), BigInt(7)], actor);
+
+    expect(prisma.role.findMany.mock.calls[0][0].where.id).toEqual({ in: [BigInt(8)] });
+    expectRolesReplacedWith(BigInt(7), BigInt(8));
+  });
+
+  it("unassign removes only the given roles", async () => {
+    managedAdmin = target("active", bursar, cashier);
+
+    await unassignAdminRoles(ADMIN_ID, [BigInt(7)], actor);
+
+    expectRolesReplacedWith(BigInt(8));
+  });
+
+  it("unassign without roles removes them all, keeping the admin in the business", async () => {
+    managedAdmin = target("active", bursar, cashier);
+
+    await unassignAdminRoles(ADMIN_ID, undefined, actor);
+
+    expectRolesReplacedWith(null);
+    expect(prisma.auditLogs.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: `admin_roles_changed: ${ADMIN_ID}, added [], removed [7, 8]` }),
     });
   });
 });
@@ -326,28 +420,51 @@ describe("updateAdminStatus", () => {
     expect(result).toMatchObject({ changed: true, admin: { status: "on_leave", leaveReason: "Annual leave" } });
   });
 
-  it.each(["blocked", "inactive", "pending"])("cannot place a %s admin on leave", async (status) => {
+  it.each(["blocked", "blocked_by_admin", "inactive", "pending"])("cannot place a %s admin on leave", async (status) => {
     managedAdmin = target(status);
 
     await expectAppError(updateAdminStatus(ADMIN_ID, leave, actor), 409, "INVALID_STATUS_TRANSITION");
     expect(prisma.users.updateMany).not.toHaveBeenCalled();
   });
 
-  it("blocks an admin on leave, clearing the leave details", async () => {
+  it("blocks an admin on leave as blocked_by_admin, clearing the leave details", async () => {
     managedAdmin = target("on_leave");
 
     await updateAdminStatus(ADMIN_ID, { status: "blocked", reason: "Policy breach" }, actor);
 
     expect(prisma.users.updateMany.mock.calls[0][0]).toEqual({
       where: { id: ADMIN_ID, status: "on_leave", deletedAt: null },
-      data: { status: "blocked", blockReason: "Policy breach", leaveReason: null, expectedReturnDate: null },
+      data: {
+        status: "blocked_by_admin",
+        blockReason: "Policy breach",
+        leaveReason: null,
+        expectedReturnDate: null,
+      },
+    });
+    expect(prisma.auditLogs.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        result: "blocked",
+        status: `admin_status_changed: ${ADMIN_ID} to blocked_by_admin due to Policy breach`,
+      }),
     });
   });
 
-  it("treats blocking a blocked admin as a no-op", async () => {
+  it("upgrades an automatic block to an admin block", async () => {
     managedAdmin = target("blocked");
+
+    const result = await updateAdminStatus(ADMIN_ID, { status: "blocked" }, actor);
+
+    expect(result.changed).toBe(true);
+    expect(prisma.users.updateMany.mock.calls[0][0]).toMatchObject({
+      where: { status: "blocked" },
+      data: { status: "blocked_by_admin" },
+    });
+  });
+
+  it("treats blocking an admin-blocked admin as a no-op", async () => {
+    managedAdmin = target("blocked_by_admin");
     prisma.users.findFirst.mockImplementation(async ({ where }: { where: { email?: string } }) =>
-      where.email ? null : { ...adminRow({ status: "blocked" }), ...target("blocked") },
+      where.email ? null : { ...adminRow({ status: "blocked_by_admin" }), ...target("blocked_by_admin") },
     );
 
     const result = await updateAdminStatus(ADMIN_ID, { status: "blocked" }, actor);
@@ -385,6 +502,18 @@ describe("reactivateAdmin", () => {
         expectedReturnDate: null,
         failedLoginCount: 0,
       },
+    });
+    expect(result.changed).toBe(true);
+  });
+
+  it("lifts an admin block", async () => {
+    managedAdmin = target("blocked_by_admin");
+
+    const result = await reactivateAdmin(ADMIN_ID, actor);
+
+    expect(prisma.users.updateMany.mock.calls[0][0]).toMatchObject({
+      where: { status: "blocked_by_admin" },
+      data: { status: "active", blockReason: null },
     });
     expect(result.changed).toBe(true);
   });

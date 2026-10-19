@@ -35,7 +35,7 @@ export const createPrismaMock = () => {
       update: jest.fn(),
       updateMany: jest.fn(),
     },
-    userHasRole: { updateMany: jest.fn() },
+    userHasRole: { updateMany: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
     userTokens: { updateMany: jest.fn() },
     auditLogs: { create: jest.fn() },
     $transaction: jest.fn(),

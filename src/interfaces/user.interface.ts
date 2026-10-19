@@ -16,5 +16,6 @@ export interface IUserResponse {
   totpSecret?: string | null;
   totpStatus?: Boolean | null;
   totpRequired?: Boolean | null;
+  expectedReturnDate?: Date | null;
 }
 

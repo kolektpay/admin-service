@@ -464,6 +464,7 @@ enum UserStatus {
   pending
   otp_verify
   on_leave
+  blocked_by_admin
 }
 
 enum AuditLoginResult {

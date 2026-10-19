@@ -590,14 +590,14 @@ export class AuditModel {
   static async logAdminCreated(
     actor: AdminActor,
     adminId: string,
-    roleId: bigint,
+    roleIds: bigint[],
     db: DbClient = prisma,
   ): Promise<void> {
     await db.auditLogs.create({
       data: {
         ...auditActor(actor),
         result: "success",
-        status: `admin_created: ${adminId} with role ${roleId}`,
+        status: `admin_created: ${adminId} with roles [${roleIds.join(", ")}]`,
       },
     });
   }
@@ -617,19 +617,18 @@ export class AuditModel {
     });
   }
 
-  static async logAdminRoleChanged(
+  static async logAdminRolesChanged(
     actor: AdminActor,
     adminId: string,
-    roleId: bigint | null,
+    added: bigint[],
+    removed: bigint[],
     db: DbClient = prisma,
   ): Promise<void> {
     await db.auditLogs.create({
       data: {
         ...auditActor(actor),
         result: "success",
-        status: roleId
-          ? `admin_role_assigned: ${adminId} to role ${roleId}`
-          : `admin_role_unassigned: ${adminId}`,
+        status: `admin_roles_changed: ${adminId}, added [${added.join(", ")}], removed [${removed.join(", ")}]`,
       },
     });
   }
@@ -658,7 +657,7 @@ export class AuditModel {
     await db.auditLogs.create({
       data: {
         ...auditActor(actor),
-        result: status === "blocked" ? "blocked" : "success",
+        result: status === "blocked" || status === "blocked_by_admin" ? "blocked" : "success",
         status: `admin_status_changed: ${adminId} to ${status}${reason ? ` due to ${reason}` : ""}`,
       },
     });

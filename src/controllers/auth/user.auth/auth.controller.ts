@@ -24,6 +24,7 @@ import { UserRoleModel } from "../../../models/userHasRole.model";
 import { UserPasswordResetModel } from "../../../models/userPasswordReset.model";
 import {
   authenticateUserService,
+  adminHeldLoginMessage,
   logInService,
   passwordValidatorService,
 } from "../../../services/auth.service";
@@ -106,6 +107,22 @@ export const loginHandler = async (
 
   if (!userInfo) {
     return errorResponse(res, "invalid login details", 404);
+  } else if (adminHeldLoginMessage(userInfo)) {
+    // On leave or blocked by an admin. Checked before the other branches so
+    // wrong passwords cannot trigger an automatic block, and the reason is
+    // only revealed to someone who knows the password
+    const passwordCheck = await passwordValidatorService(
+      userInfo.password,
+      password,
+    );
+
+    await AuditModel.logFailedLogin(userInfo.id, ip);
+
+    if (!passwordCheck) {
+      return errorResponse(res, "Invalid login credentials", 401);
+    }
+
+    return errorResponse(res, adminHeldLoginMessage(userInfo)!, 403);
   } else if (
     !userInfo.totpSecret &&
     userInfo.status === "active" &&
@@ -427,6 +444,12 @@ export const authenticateRefreshTokenHandler = async (
     }
 
     if (!verification.tokenData.userId) {
+      return errorResponse(res, "Invalid refresh token!", 401);
+    }
+
+    // Users placed on leave, blocked (by an admin or automatically) or deleted since login cannot extend their session
+    if (!(await UserModel.canHoldSession(verification.tokenData.userId))) {
+      await TokenManager.revokeAllUserTokens(verification.tokenData.userId);
       return errorResponse(res, "Invalid refresh token!", 401);
     }
 

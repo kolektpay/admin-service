@@ -118,6 +118,7 @@ describe("authentication and authorisation", () => {
     ["get", "/users", "admin.user_management.read_user"],
     ["post", "/users", "admin.user_management.create_user"],
     ["patch", `/users/${ADMIN_ID}`, "admin.user_management.update_user"],
+    ["put", `/users/${ADMIN_ID}/roles`, "admin.user_management.update_user"],
     ["patch", `/users/${ADMIN_ID}/status`, "admin.user_management.update_user"],
     ["delete", `/users/${ADMIN_ID}`, "admin.user_management.delete_user"],
   ])("%s %s requires %s", async (method, path, permission) => {
@@ -246,20 +247,79 @@ describe("administrators", () => {
     expect(res.body.code).toBe("ADMIN_NOT_FOUND");
   });
 
-  it("POST /users creates an admin without exposing the password", async () => {
-    prisma.role.findFirst.mockResolvedValue({ name: "Bursar", permissions: [{ permissionId: BigInt(61) }] });
+  it("POST /users creates an admin with several roles without exposing the password", async () => {
+    prisma.role.findMany.mockResolvedValue([
+      { id: BigInt(7), name: "Bursar", permissions: [{ permissionId: BigInt(61) }] },
+      { id: BigInt(9), name: "Auditor", permissions: [] },
+    ]);
     prisma.users.findFirst.mockResolvedValue(null);
-    prisma.users.create.mockResolvedValue(adminRow());
+    prisma.users.create.mockResolvedValue(
+      adminRow({
+        userHasRoles: [
+          { role: { id: BigInt(7), name: "Bursar" } },
+          { role: { id: BigInt(9), name: "Auditor" } },
+        ],
+      }),
+    );
 
     const res = await request(app)
       .post(`${BASE}/users`)
       .set(AUTH)
-      .send({ email: "Jane.Smith@example.com", firstName: "Jane", lastName: "Smith", roleId: 7 });
+      .send({ email: "Jane.Smith@example.com", firstName: "Jane", lastName: "Smith", roleIds: [7, 9] });
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("User created successfully");
-    expect(res.body.data).toMatchObject({ id: ADMIN_ID, role: { id: 7, name: "Bursar" } });
+    expect(res.body.data).toMatchObject({
+      id: ADMIN_ID,
+      roles: [{ id: 7, name: "Bursar" }, { id: 9, name: "Auditor" }],
+      role: { id: 7, name: "Bursar" },
+    });
     expect(JSON.stringify(res.body)).not.toMatch(/hashed:/);
+  });
+
+  it("POST /users requires at least one role", async () => {
+    const res = await request(app)
+      .post(`${BASE}/users`)
+      .set(AUTH)
+      .send({ email: "jane@example.com", firstName: "Jane", lastName: "Smith" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details.map((d: { field: string }) => d.field)).toContain("roleIds");
+    expect(prisma.users.create).not.toHaveBeenCalled();
+  });
+
+  it("PUT /users/:id/roles replaces the admin's roles", async () => {
+    prisma.users.findFirst.mockResolvedValue({
+      id: ADMIN_ID,
+      status: "active",
+      userHasRoles: [{ role: { id: BigInt(7), name: "Bursar" } }],
+    });
+    prisma.role.findMany.mockResolvedValue([{ id: BigInt(9), name: "Auditor", permissions: [] }]);
+    prisma.users.findUniqueOrThrow.mockResolvedValue(
+      adminRow({ userHasRoles: [{ role: { id: BigInt(9), name: "Auditor" } }] }),
+    );
+
+    const res = await request(app)
+      .put(`${BASE}/users/${ADMIN_ID}/roles`)
+      .set(AUTH)
+      .send({ roleIds: [9] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("User roles updated successfully");
+    expect(res.body.data.roles).toEqual([{ id: 9, name: "Auditor" }]);
+    expect(prisma.userHasRole.createMany).toHaveBeenCalledWith({
+      data: [{ userId: ADMIN_ID, roleId: BigInt(9), businessId: BigInt(1) }],
+    });
+  });
+
+  it("PUT /users/:id/roles rejects an empty role list", async () => {
+    const res = await request(app)
+      .put(`${BASE}/users/${ADMIN_ID}/roles`)
+      .set(AUTH)
+      .send({ roleIds: [] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].field).toBe("roleIds");
   });
 
   it("PATCH /users/:id/status places an admin on leave", async () => {
@@ -302,21 +362,27 @@ describe("administrators", () => {
     expect(res.body.code).toBe("CANNOT_MANAGE_SELF");
   });
 
-  it("POST /users/roles/assign replaces the admin's role", async () => {
-    prisma.users.findFirst.mockResolvedValue({ id: ADMIN_ID, status: "active", userHasRoles: [] });
-    prisma.role.findFirst.mockResolvedValue({ name: "Bursar", permissions: [] });
+  it("POST /users/roles/assign adds to the admin's roles", async () => {
+    prisma.users.findFirst.mockResolvedValue({
+      id: ADMIN_ID,
+      status: "active",
+      userHasRoles: [{ role: { id: BigInt(7), name: "Bursar" } }],
+    });
+    prisma.role.findMany.mockResolvedValue([{ id: BigInt(9), name: "Auditor", permissions: [] }]);
     prisma.users.findUniqueOrThrow.mockResolvedValue(adminRow());
 
     const res = await request(app)
       .post(`${BASE}/users/roles/assign`)
       .set(AUTH)
-      .send({ action: "assign", userId: ADMIN_ID, roleIds: [7] });
+      .send({ action: "assign", userId: ADMIN_ID, roleIds: [9] });
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("User role has been assigned");
-    expect(prisma.users.update.mock.calls[0][0].data.userHasRoles).toEqual({
-      deleteMany: { businessId: BigInt(1) },
-      create: { roleId: BigInt(7), businessId: BigInt(1) },
+    expect(prisma.userHasRole.createMany).toHaveBeenCalledWith({
+      data: [
+        { userId: ADMIN_ID, roleId: BigInt(7), businessId: BigInt(1) },
+        { userId: ADMIN_ID, roleId: BigInt(9), businessId: BigInt(1) },
+      ],
     });
   });
 });

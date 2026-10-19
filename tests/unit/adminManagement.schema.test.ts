@@ -2,6 +2,7 @@ import {
   createAdminSchema,
   listAdminsQuerySchema,
   roleAssignmentSchema,
+  setAdminRolesSchema,
   updateAdminSchema,
   updateAdminStatusSchema,
 } from "../../src/validations/adminManagement.schema";
@@ -72,28 +73,43 @@ describe("createAdminSchema", () => {
     email: "  Jane.Smith@Example.com ",
     firstName: "Jane",
     lastName: "Smith",
-    roleId: 7,
+    roleIds: [7, "9", 7],
   };
 
-  it("lower-cases email and names and parses the role", () => {
+  it("lower-cases email and names and de-duplicates the roles", () => {
     expect(createAdminSchema.parse(body)).toEqual({
       email: "jane.smith@example.com",
       firstName: "jane",
       lastName: "smith",
-      roleId: BigInt(7),
+      roleIds: [BigInt(7), BigInt(9)],
     });
   });
 
-  it("accepts a single-element roleId array for existing clients", () => {
-    expect(createAdminSchema.parse({ ...body, roleId: [7] }).roleId).toBe(BigInt(7));
+  it.each([
+    [7, [BigInt(7)]],
+    [[7, 8], [BigInt(7), BigInt(8)]],
+  ])("accepts the legacy roleId %j as roleIds", (roleId, roleIds) => {
+    const { roleIds: _omitted, ...rest } = body;
+    const parsed = createAdminSchema.parse({ ...rest, roleId });
+    expect(parsed.roleIds).toEqual(roleIds);
+    expect(parsed).not.toHaveProperty("roleId");
   });
 
-  it("rejects more than one role", () => {
-    const result = createAdminSchema.safeParse({ ...body, roleId: [7, 8] });
+  it("rejects roleId and roleIds together", () => {
+    const result = createAdminSchema.safeParse({ ...body, roleId: 8 });
     expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path[0]).toBe("roleId");
   });
 
-  it.each(["email", "firstName", "lastName", "roleId"])("requires %s", (field) => {
+  it.each([
+    [[], "an empty list"],
+    [[0], "a non-positive id"],
+    [Array.from({ length: 11 }, (_, i) => i + 1), "more than 10 roles"],
+  ])("rejects %j (%s)", (roleIds) => {
+    expect(createAdminSchema.safeParse({ ...body, roleIds }).success).toBe(false);
+  });
+
+  it.each(["email", "firstName", "lastName", "roleIds"])("requires %s", (field) => {
     const { [field as keyof typeof body]: _omitted, ...rest } = body;
     expect(createAdminSchema.safeParse(rest).success).toBe(false);
   });
@@ -110,11 +126,32 @@ describe("updateAdminSchema", () => {
   });
 
   it("accepts a role change on its own", () => {
-    expect(updateAdminSchema.parse({ roleId: "8" })).toEqual({ roleId: BigInt(8) });
+    expect(updateAdminSchema.parse({ roleIds: [8, 9] })).toEqual({
+      roleIds: [BigInt(8), BigInt(9)],
+    });
+  });
+
+  it("turns the legacy roleId into a single-role set", () => {
+    expect(updateAdminSchema.parse({ roleId: "8" })).toEqual({ roleIds: [BigInt(8)] });
+  });
+
+  it("rejects roleId and roleIds together, and an empty role set", () => {
+    expect(updateAdminSchema.safeParse({ roleId: 8, roleIds: [9] }).success).toBe(false);
+    expect(updateAdminSchema.safeParse({ roleIds: [] }).success).toBe(false);
   });
 
   it("allows clearing the phone number", () => {
     expect(updateAdminSchema.parse({ phoneNumber: null })).toEqual({ phoneNumber: null });
+  });
+});
+
+describe("setAdminRolesSchema", () => {
+  it("requires a non-empty roleIds list and nothing else", () => {
+    expect(setAdminRolesSchema.parse({ roleIds: [7, 7, 9] })).toEqual({
+      roleIds: [BigInt(7), BigInt(9)],
+    });
+    expect(setAdminRolesSchema.safeParse({ roleIds: [] }).success).toBe(false);
+    expect(setAdminRolesSchema.safeParse({ roleId: 7 }).success).toBe(false);
   });
 });
 
@@ -194,15 +231,15 @@ describe("updateAdminStatusSchema", () => {
 describe("roleAssignmentSchema", () => {
   const userId = "321d02df-abcf-4ca7-a53d-75c2858633c0";
 
-  it("requires exactly one role to assign", () => {
+  it("requires at least one role to assign", () => {
     expect(roleAssignmentSchema.safeParse({ action: "assign", userId }).success).toBe(false);
     expect(
-      roleAssignmentSchema.safeParse({ action: "assign", userId, roleIds: [1, 2] }).success,
+      roleAssignmentSchema.safeParse({ action: "assign", userId, roleIds: [] }).success,
     ).toBe(false);
-    expect(roleAssignmentSchema.parse({ action: "assign", userId, roleIds: [1] })).toEqual({
+    expect(roleAssignmentSchema.parse({ action: "assign", userId, roleIds: [1, 2] })).toEqual({
       action: "assign",
       userId,
-      roleIds: [BigInt(1)],
+      roleIds: [BigInt(1), BigInt(2)],
     });
   });
 

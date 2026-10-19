@@ -3,12 +3,13 @@ import { Request, Response } from "express";
 import { AdminActor } from "../../interfaces/admin.interfaces";
 import { AuditModel } from "../../models/audit.model";
 import {
+  assignAdminRoles,
   createAdmin,
   deleteAdmin,
   getAdminById,
   listAdmins,
   reactivateAdmin,
-  unassignAdminRole,
+  unassignAdminRoles,
   updateAdmin,
   updateAdminStatus,
 } from "../../services/admin.service";
@@ -17,6 +18,7 @@ import { successResponse } from "../../utils/response.util";
 import {
   CreateAdminInput,
   ListAdminsQuery,
+  SetAdminRolesInput,
   UpdateAdminInput,
   UpdateAdminStatusInput,
 } from "../../validations/adminManagement.schema";
@@ -42,7 +44,7 @@ const getAdminId = (req: Request): string => req.params.id as string;
  *         firstName: { type: string, example: jane }
  *         lastName: { type: string, example: smith }
  *         phoneNumber: { type: string, nullable: true, example: "+2348031110021" }
- *         status: { type: string, enum: [active, inactive, blocked, suspended, pending, otp_verify, on_leave], example: active }
+ *         status: { type: string, enum: [active, inactive, blocked, suspended, pending, otp_verify, on_leave, blocked_by_admin], example: active }
  *         blockReason: { type: string, nullable: true }
  *         leaveReason: { type: string, nullable: true, example: Annual leave }
  *         expectedReturnDate: { type: string, format: date, nullable: true, example: "2026-11-02" }
@@ -53,10 +55,19 @@ const getAdminId = (req: Request): string => req.params.id as string;
  *         passwordExpiresAt: { type: string, format: date-time, nullable: true }
  *         createdAt: { type: string, format: date-time }
  *         updatedAt: { type: string, format: date-time }
+ *         roles:
+ *           type: array
+ *           description: The administrator's roles in your business, in the order they were assigned
+ *           items:
+ *             type: object
+ *             properties:
+ *               id: { type: integer, example: 7 }
+ *               name: { type: string, example: Bursar }
  *         role:
  *           type: object
  *           nullable: true
- *           description: The administrator's single role in your business
+ *           deprecated: true
+ *           description: The first of roles, kept for clients of the single-role response shape
  *           properties:
  *             id: { type: integer, example: 7 }
  *             name: { type: string, example: Bursar }
@@ -77,8 +88,8 @@ const getAdminId = (req: Request): string => req.params.id as string;
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 10 } }
- *       - { in: query, name: role, schema: { type: string }, description: Role name (case-insensitive exact match), example: Bursar }
- *       - { in: query, name: status, schema: { type: string, enum: [active, inactive, blocked, suspended, pending, otp_verify, on_leave] } }
+ *       - { in: query, name: role, schema: { type: string }, description: Holds a role with this name (case-insensitive exact match), example: Bursar }
+ *       - { in: query, name: status, schema: { type: string, enum: [active, inactive, blocked, suspended, pending, otp_verify, on_leave, blocked_by_admin] } }
  *       - { in: query, name: name, schema: { type: string }, description: Matches first or last name (every word must match), example: jane smith }
  *       - { in: query, name: email, schema: { type: string }, description: Case-insensitive partial match, example: "@example.com" }
  *       - { in: query, name: search, schema: { type: string }, description: Partial match on email, first name or last name }
@@ -86,7 +97,7 @@ const getAdminId = (req: Request): string => req.params.id as string;
  *       200:
  *         description: |
  *           Administrators fetched. Each record also carries userHasRoles
- *           (the role in the earlier response shape).
+ *           (the roles in the earlier response shape).
  *         content:
  *           application/json:
  *             example:
@@ -101,8 +112,9 @@ const getAdminId = (req: Request): string => req.params.id as string;
  *                     status: on_leave
  *                     leaveReason: Annual leave
  *                     expectedReturnDate: "2026-11-02T00:00:00.000Z"
+ *                     roles: [{ id: 7, name: Bursar }, { id: 9, name: Auditor }]
  *                     role: { id: 7, name: Bursar }
- *                     userHasRoles: [{ role: { id: 7, name: Bursar } }]
+ *                     userHasRoles: [{ role: { id: 7, name: Bursar } }, { role: { id: 9, name: Auditor } }]
  *                 pagination: { page: 1, limit: 10, total: 1, totalPages: 1 }
  *       400:
  *         description: Invalid query parameters
@@ -181,12 +193,13 @@ export const getAdminHandler = async (
  * @swagger
  * /api/v1/admin/users:
  *   post:
- *     summary: Create an administrator with a role
+ *     summary: Create an administrator with one or more roles
  *     description: |
- *       Creates an administrator in your business with exactly one role, and emails them a
- *       temporary password they must change on first login. The account, role assignment and
- *       email are saved in one transaction. The manager role cannot be assigned, and you cannot
- *       assign a role with permissions you do not hold.
+ *       Creates an administrator in your business with the given roles (up to 10), and emails
+ *       them a temporary password they must change on first login. The account, role
+ *       assignments and email are saved in one transaction. The administrator gets the combined
+ *       permissions of all their roles. The manager role cannot be assigned, and you cannot
+ *       assign roles with permissions you do not hold.
  *       Requires the admin.user_management.create_user permission.
  *     tags:
  *       - Users
@@ -198,17 +211,19 @@ export const getAdminHandler = async (
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, firstName, lastName, roleId]
+ *             required: [email, firstName, lastName, roleIds]
  *             properties:
  *               email: { type: string, format: email, example: jane.smith@example.com }
  *               firstName: { type: string, example: Jane }
  *               lastName: { type: string, example: Smith }
  *               phoneNumber: { type: string, example: "+2348031110021" }
+ *               roleIds: { type: array, items: { type: integer }, minItems: 1, maxItems: 10, example: [7, 9], description: Duplicates are ignored }
  *               roleId:
- *                 description: A role ID (a single-element array is also accepted)
+ *                 deprecated: true
+ *                 description: Accepted instead of roleIds for existing clients. Send one or the other.
  *                 oneOf:
  *                   - { type: integer, example: 7 }
- *                   - { type: array, items: { type: integer }, minItems: 1, maxItems: 1, example: [7] }
+ *                   - { type: array, items: { type: integer }, example: [7] }
  *     responses:
  *       200:
  *         description: Administrator created
@@ -225,13 +240,14 @@ export const getAdminHandler = async (
  *                 phoneNumber: "+2348031110021"
  *                 status: inactive
  *                 mustChangePassword: true
+ *                 roles: [{ id: 7, name: Bursar }, { id: 9, name: Auditor }]
  *                 role: { id: 7, name: Bursar }
  *       400:
- *         description: Validation failed (VALIDATION_ERROR) or role does not exist (INVALID_ROLE)
+ *         description: Validation failed (VALIDATION_ERROR) or a role does not exist (INVALID_ROLE)
  *       401:
  *         description: Unauthorized - Invalid or missing access token
  *       403:
- *         description: Missing permission, manager role (MANAGER_ROLE_NOT_ASSIGNABLE), or role grants permissions you do not hold (PERMISSION_ESCALATION)
+ *         description: Missing permission, manager role (MANAGER_ROLE_NOT_ASSIGNABLE), or the roles grant permissions you do not hold (PERMISSION_ESCALATION)
  *       409:
  *         description: Email already in use (EMAIL_TAKEN)
  */
@@ -247,11 +263,12 @@ export const createAdminHandler = async (
  * @swagger
  * /api/v1/admin/users/{id}:
  *   patch:
- *     summary: Update an administrator's details or role
+ *     summary: Update an administrator's details or roles
  *     description: |
- *       Send only the fields to change. A new roleId replaces the administrator's current role.
- *       You can update your own details but not your own role, and nobody else can update the
- *       business manager. Requires the admin.user_management.update_user permission.
+ *       Send only the fields to change. roleIds is the complete set of roles the administrator
+ *       should hold, as with PUT /api/v1/admin/users/{id}/roles. You can update your own details
+ *       but not your own roles, and nobody else can update the business manager.
+ *       Requires the admin.user_management.update_user permission.
  *     tags:
  *       - Users
  *     security:
@@ -270,7 +287,8 @@ export const createAdminHandler = async (
  *               firstName: { type: string, example: Jane }
  *               lastName: { type: string, example: Smith }
  *               phoneNumber: { type: string, nullable: true, example: "+2348031110021" }
- *               roleId: { type: integer, example: 8 }
+ *               roleIds: { type: array, items: { type: integer }, minItems: 1, maxItems: 10, example: [7, 8] }
+ *               roleId: { type: integer, example: 8, deprecated: true, description: Replaces all roles with this one. Send roleIds or roleId, not both. }
  *     responses:
  *       200:
  *         description: Administrator updated
@@ -287,7 +305,7 @@ export const createAdminHandler = async (
  *       401:
  *         description: Unauthorized - Invalid or missing access token
  *       403:
- *         description: Missing permission, changing your own role (CANNOT_MANAGE_SELF), the business manager (MANAGER_PROTECTED), manager role (MANAGER_ROLE_NOT_ASSIGNABLE) or PERMISSION_ESCALATION
+ *         description: Missing permission, changing your own roles (CANNOT_MANAGE_SELF), the business manager (MANAGER_PROTECTED), manager role (MANAGER_ROLE_NOT_ASSIGNABLE) or PERMISSION_ESCALATION
  *       404:
  *         description: No administrator with this ID in your business (ADMIN_NOT_FOUND)
  *       409:
@@ -303,6 +321,63 @@ export const updateAdminHandler = async (
     getActor(req),
   );
   successResponse(res, "User updated successfully", admin);
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}/roles:
+ *   put:
+ *     summary: Reassign an administrator's roles
+ *     description: |
+ *       Send the complete set of roles the administrator should hold. Roles not in the list are
+ *       removed and new ones are added, in one transaction, and the change is audited.
+ *       To add a role, send the current roles plus the new one; to remove one, leave it out.
+ *       Only added roles are checked: you cannot add the manager role or a role granting
+ *       permissions you do not hold, but you can remove any role. You cannot change your own
+ *       roles or the business manager's.
+ *       Requires the admin.user_management.update_user permission.
+ *     tags:
+ *       - Users
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleIds]
+ *             properties:
+ *               roleIds: { type: array, items: { type: integer }, minItems: 1, maxItems: 10, example: [7, 9], description: Duplicates are ignored }
+ *     responses:
+ *       200:
+ *         description: Roles updated (or unchanged when the set is the same)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: User roles updated successfully }
+ *                 data: { $ref: '#/components/schemas/Administrator' }
+ *       400:
+ *         description: Validation failed or a role does not exist (INVALID_ROLE)
+ *       401:
+ *         description: Unauthorized - Invalid or missing access token
+ *       403:
+ *         description: Missing permission, CANNOT_MANAGE_SELF, MANAGER_PROTECTED, MANAGER_ROLE_NOT_ASSIGNABLE or PERMISSION_ESCALATION
+ *       404:
+ *         description: No administrator with this ID in your business (ADMIN_NOT_FOUND)
+ */
+export const setAdminRolesHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const { roleIds } = req.body as SetAdminRolesInput;
+  const admin = await updateAdmin(getAdminId(req), { roleIds }, getActor(req));
+  successResponse(res, "User roles updated successfully", admin);
 };
 
 /**
@@ -349,7 +424,9 @@ export const deleteAdminHandler = async (
  *       Both statuses revoke the administrator's sessions and stop them logging in until they
  *       are reactivated with PATCH /api/v1/admin/users/{id}/unblock.
  *
- *       - **blocked**: reason is optional. Blocking an already blocked administrator changes nothing.
+ *       - **blocked**: reason is optional. Stored as status blocked_by_admin, which (unlike the
+ *         automatic "blocked" after failed logins) a password reset cannot clear. Blocking an
+ *         administrator already blocked by an admin changes nothing.
  *       - **on_leave**: reason and expectedReturnDate (YYYY-MM-DD, after today) are required.
  *         Only active administrators (or ones already on leave, to update the details) can be placed on leave.
  *
@@ -487,7 +564,7 @@ export const blockAdminHandler = async (
  *   patch:
  *     summary: Reactivate a blocked or on-leave administrator
  *     description: |
- *       Restores a blocked or on-leave administrator to active, clearing the block and leave
+ *       Restores a blocked (by an admin or automatically) or on-leave administrator to active, clearing the block and leave
  *       details. Administrators with any other status are left unchanged.
  *       Requires the admin.user_management.update_user permission.
  *     tags:
@@ -525,11 +602,12 @@ export const unblockAdminHandler = async (
  * @swagger
  * /api/v1/admin/users/roles/assign:
  *   post:
- *     summary: Assign or unassign an administrator's role
+ *     summary: Assign or unassign roles
  *     description: |
- *       An administrator holds one role: "assign" replaces their current role with the single
- *       role in roleIds; "unassign" removes it. PATCH /api/v1/admin/users/{id} with roleId does
- *       the same as "assign". Requires the admin.user_management.update_user permission.
+ *       "assign" adds the roles in roleIds to the ones the administrator already holds.
+ *       "unassign" removes the roles in roleIds, or every role when roleIds is omitted.
+ *       PUT /api/v1/admin/users/{id}/roles sets the complete list in one call instead.
+ *       Requires the admin.user_management.update_user permission.
  *     tags:
  *       - Users
  *     security:
@@ -544,10 +622,10 @@ export const unblockAdminHandler = async (
  *             properties:
  *               action: { type: string, enum: [assign, unassign], example: assign }
  *               userId: { type: string, format: uuid }
- *               roleIds: { type: array, items: { type: integer }, minItems: 1, maxItems: 1, example: [7], description: Required for assign }
+ *               roleIds: { type: array, items: { type: integer }, minItems: 1, maxItems: 10, example: [7, 9], description: Required for assign }
  *     responses:
  *       200:
- *         description: Role assigned or unassigned
+ *         description: Roles assigned or unassigned
  *       400:
  *         description: Validation failed or role does not exist (INVALID_ROLE)
  *       401:
@@ -562,12 +640,13 @@ export const assignRoleHandler = async (
   res: Response,
 ): Promise<void> => {
   const actor = getActor(req);
+  const { action, userId, roleIds } = req.body;
 
-  if (req.body.action === "assign") {
-    await updateAdmin(req.body.userId, { roleId: req.body.roleIds[0] }, actor);
+  if (action === "assign") {
+    await assignAdminRoles(userId, roleIds, actor);
     return successResponse(res, "User role has been assigned");
   }
 
-  await unassignAdminRole(req.body.userId, actor);
+  await unassignAdminRoles(userId, roleIds, actor);
   successResponse(res, "User role has been unassigned");
 };
