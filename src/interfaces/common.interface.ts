@@ -14,19 +14,7 @@ export interface IServiceResponse{
 
 }
 
-export interface IPaginationParams {
-    page: number;
-    limit: number;
-}
-
-export interface IPaginatedResponse<T> {
-    success: boolean;
-    message: string;
-    data: T[];
-    pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        totalPages: number;
-    };
+export interface IFieldError {
+  field: string;
+  message: string;
 }

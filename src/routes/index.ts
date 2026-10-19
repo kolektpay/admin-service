@@ -1,29 +1,30 @@
 import { Router } from "express";
+
 import { config } from "../config/app";
 import authRouter from "./auth/auth.routes";
-import walletRouter from "./admin/admin.wallet.routes";
-import transactionsRouter from "./admin/admin.transactions.routes";
-import adminRouter from "./admin/admin.routes";
-import adminStudentRouter from "./admin/admin.student.routes";
-import adminGuardianRouter from "./admin/admin.guardian.routes";
+import adminGuardianRouter from "./guardian.routes/guardian.routes";
+import roleRouter from "./role/role.routes";
+import adminStudentRouter from "./student/student.routes";
+import transactionsRouter from "./transactions/transactions.routes";
+import adminRouter from "./user.routes";
+import walletRouter from "./wallet/wallet.routes";
 
 const router = Router();
 
 // API routes
 router.use("/admin/auth", authRouter);
 router.use("/admin", adminRouter);
+router.use("/admin", roleRouter);
 
 router.use("/admin/students", adminStudentRouter);
 router.use("/admin/guardians", adminGuardianRouter);
-
-
 
 router.use("/admin/wallet", walletRouter);
 router.use("/admin/transactions", transactionsRouter);
 
 // Health check
 router.get("/health", (req, res) => {
-console.log(req.body)
+  console.log(req.body);
   res.json({
     success: true,
     message: "Server is running.",

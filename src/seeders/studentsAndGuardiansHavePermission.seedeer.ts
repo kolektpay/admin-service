@@ -4,7 +4,7 @@ export const studentsAndGuardiansHavePermissionsSeeder = async () => {
   try {
     console.log("🌱 Seeding student and guardian permissions...");
 
-    await prisma.studentsAndGuardiansHavePermissionsTable.deleteMany();
+    await prisma.studentGuardianHasPermissions.deleteMany();
 
     const studentPermissions = await prisma.permissions.findMany({
       where: {
@@ -40,7 +40,7 @@ export const studentsAndGuardiansHavePermissionsSeeder = async () => {
       ...guardianPermissionRecords,
     ];
 
-    await prisma.studentsAndGuardiansHavePermissionsTable.createMany({
+    await prisma.studentGuardianHasPermissions.createMany({
       data: allPermissionRecords,
       skipDuplicates: true,
     });

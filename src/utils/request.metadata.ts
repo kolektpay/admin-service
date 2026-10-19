@@ -1,15 +1,9 @@
 // src/utils/request-metadata.util.ts
 import { Request } from "express";
-import { UAParser } from "ua-parser-js";
 import geoip from "geoip-lite";
+import { UAParser } from "ua-parser-js";
 
-export interface RequestMetadata {
-  ip?: string;
-  location?: string;
-  device?: string;
-  browser?: string;
-  os?: string;
-}
+import { RequestMetadata } from "../interfaces/requestMetadata.interface";
 
 export const extractRequestMetadata = (
   req: Request

@@ -1,12 +1,13 @@
-import express, { Application } from "express";
 import cors from "cors";
+import express, { Application } from "express";
 import helmet from "helmet";
+import swaggerUi from "swagger-ui-express";
+
 import { config } from "./config/app";
-import routes from "./routes";
+import swaggerSpec from "./config/swagger";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import { requestLogger } from "./middleware/logger.middleware";
-import swaggerUi from "swagger-ui-express";
-import swaggerSpec from "./config/swagger";
+import routes from "./routes";
 
 // add here - after imports, before app setup
 (BigInt.prototype as any).toJSON = function () {

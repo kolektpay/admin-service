@@ -54,3 +54,14 @@ export interface CreatePaymentItemWalletResponse {
   data: PaymentItemWalletData;
 }
 
+export interface StudentInvoiceWithPaymentStatus {
+  invoice_number: string;
+  description: string;
+  end_date: Date;
+  start_date: Date;
+  payment_item_id: bigint;
+  status: string;
+  invoice_amount: string; // Prisma returns Decimal as string via $queryRaw
+  total_receipt_amount: string;
+  payment_status: "Unpaid" | "Part Payment" | "Full Payment";
+}

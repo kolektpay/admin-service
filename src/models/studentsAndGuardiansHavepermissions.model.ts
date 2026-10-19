@@ -13,7 +13,7 @@ export class StudentsAndGuardiansHavePermissionsModel {
   ) {
 
   
-    return prisma.studentsAndGuardiansHavePermissionsTable.findMany({
+    return prisma.studentGuardianHasPermissions.findMany({
       where: {
         businessId,
         studentId: clientRole === "student" ? clientId : undefined,
@@ -52,11 +52,11 @@ export class StudentsAndGuardiansHavePermissionsModel {
 
 
   await prisma.$transaction([
-    prisma.studentsAndGuardiansHavePermissionsTable.deleteMany({
+    prisma.studentGuardianHasPermissions.deleteMany({
       where: { studentId },
     }),
 
-    prisma.studentsAndGuardiansHavePermissionsTable.createMany({
+    prisma.studentGuardianHasPermissions.createMany({
       data: permissions.map((permission) => ({
         studentId,
         businessId,

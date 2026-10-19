@@ -8,11 +8,15 @@ module.exports = {
   clearMocks: true,
   collectCoverageFrom: [
     "src/validations/studentManagement.schema.ts",
-    "src/services/admin.student.service.ts",
-    "src/services/admin.student.bulk.service.ts",
-    "src/controllers/admin/admin.student.controller.ts",
+    "src/services/studentservice.service.ts",
+    "src/controllers/student/student.controller.ts",
     "src/helpers/prismaError.helper.ts",
     "src/utils/asyncHandler.ts",
     "src/middleware/validation.middleware.ts",
+    "src/validations/adminManagement.schema.ts",
+    "src/validations/roleManagement.schema.ts",
+    "src/services/admin.service.ts",
+    "src/services/role.service.ts",
+    "src/controllers/admin/*.ts",
   ],
 };

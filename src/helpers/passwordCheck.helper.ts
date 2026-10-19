@@ -1,16 +1,9 @@
 
+import { PasswordCheckResult } from "../interfaces/auth.interface";
 import { IUserResponse } from "../interfaces/user.interface";
-
 import { AuditModel } from "../models/audit.model";
 import { UserModel } from "../models/user.model";
-
 import ApiError from "../utils/apiError";
-
-interface PasswordCheckResult {
-  success: boolean;
-  accountBlocked?: boolean;
-  failedLoginCount?: number;
-}
 
 export const passwordCheckerAndLoggingFunction = async (
   user: IUserResponse,

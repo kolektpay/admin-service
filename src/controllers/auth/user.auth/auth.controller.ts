@@ -1,44 +1,35 @@
+import bcrypt from "bcrypt";
+import dotenv from "dotenv";
 import { Request, Response } from "express";
-import { successResponse, errorResponse } from "../../../utils/response.util";
-import {
-  authenticateUserService,
-  logInService,
-  passwordValidatorService,
-} from "../../../services/auth.service";
-import TokenManager from "../../../utils/token.manager";
-import { extractRequestMetadata } from "../../../utils/request.metadata";
-import TotpManager from "../../../utils/twoFactorManager";
+
+import { getCurrentTimestamp } from "../../../helpers/date.helper";
+import { passwordCheckerAndLoggingFunction } from "../../../helpers/passwordCheck.helper";
 import {
   FinalUserInfoInterface,
-  KolektSuperAdminLoginInfoInterface,
   TokenPair,
   UserLoginInfoIfNo2faInterface,
   UserLoginInfoInterface,
 } from "../../../interfaces/auth.interface";
-import { UserModel } from "../../../models/user.model";
-import { PasswordResetTokenManager } from "../../../utils/passwordResetManager";
-import { UserPasswordResetModel } from "../../../models/userPasswordReset.model";
+import { passwordHistoryChecker } from "../../../managers/passwordHistoryChecker";
+import { PasswordResetTokenManager } from "../../../managers/passwordResetManager";
+import { TempPasswordTokenManager } from "../../../managers/tempPasswordTokenManager";
+import TokenManager from "../../../managers/token.manager";
+import TotpManager from "../../../managers/twoFactorManager";
+import { AuditModel } from "../../../models/audit.model";
+import { BusinessTypesModel } from "../../../models/businessTypes.model";
 import { NotificationModel } from "../../../models/notifications.model";
 import { PasswordHistoryModel } from "../../../models/passwordHistory.model";
-import bcrypt from "bcrypt";
-import { passwordHistoryChecker } from "../../../utils/passwordHistoryChecker";
-import { AuditModel } from "../../../models/audit.model";
+import { UserModel } from "../../../models/user.model";
 import { UserRoleModel } from "../../../models/userHasRole.model";
-import { RolePermissionModel } from "../../../models/permissions.model";
-import { ICreateUserDTO } from "../../../interfaces/user.interface";
-import { createUserBeforeOtpVerify } from "../../../services/user.service";
-import { IServiceResponse } from "../../../interfaces/common.interface";
-import { ICreateBusinessDTO } from "../../../interfaces/business.interface";
-import { createUserBusiness } from "../../../services/userbusiness.service";
-import { TempPasswordTokenManager } from "../../../utils/tempPasswordTokenManager";
-import OtpGenerator from "../../../utils/otpRegistrationManager";
-import dotenv from "dotenv";
-import { onBoardTrackerType } from "@prisma/client";
-
-import { getCurrentTimestamp } from "../../../helpers/date.helper";
-import { passwordCheckerAndLoggingFunction } from "../../../helpers/passwordCheck.helper";
-import { isKolektSuperAdmin } from "../../../helpers/kolektSuperAdminDbCheck.helper";
-import { BusinessTypesModel } from "../../../models/businessTypes.model";
+import { UserPasswordResetModel } from "../../../models/userPasswordReset.model";
+import {
+  authenticateUserService,
+  adminHeldLoginMessage,
+  logInService,
+  passwordValidatorService,
+} from "../../../services/auth.service";
+import { extractRequestMetadata } from "../../../utils/request.metadata";
+import { successResponse, errorResponse } from "../../../utils/response.util";
 
 dotenv.config();
 
@@ -113,10 +104,25 @@ export const loginHandler = async (
   const { ip } = extractRequestMetadata(req);
 
   const userInfo = await authenticateUserService(email);
-  const isUserKolektSuperAdmin = await isKolektSuperAdmin(email);
 
   if (!userInfo) {
     return errorResponse(res, "invalid login details", 404);
+  } else if (adminHeldLoginMessage(userInfo)) {
+    // On leave or blocked by an admin. Checked before the other branches so
+    // wrong passwords cannot trigger an automatic block, and the reason is
+    // only revealed to someone who knows the password
+    const passwordCheck = await passwordValidatorService(
+      userInfo.password,
+      password,
+    );
+
+    await AuditModel.logFailedLogin(userInfo.id, ip);
+
+    if (!passwordCheck) {
+      return errorResponse(res, "Invalid login credentials", 401);
+    }
+
+    return errorResponse(res, adminHeldLoginMessage(userInfo)!, 403);
   } else if (
     !userInfo.totpSecret &&
     userInfo.status === "active" &&
@@ -235,37 +241,9 @@ export const loginHandler = async (
 
         const userRoles = await UserRoleModel.getUserRoles(userInfo.id);
 
-        const actionsArray: string[] = [];
-        const menusArray: string[] = [];
-        const rolesArray: string[] = [];
-        const roleIdArray: bigint[] = [];
-
         if (!userRoles || userRoles.length === 0) {
           return errorResponse(res, "No roles were assigned to this user", 404);
         }
-
-        userRoles.forEach((userRole) => {
-          if (userRole.role) {
-            rolesArray.push(userRole.role.name);
-          }
-
-          if (userRole.roleId) {
-            roleIdArray.push(userRole.roleId);
-          }
-        });
-
-        const allUserPermissions =
-          await RolePermissionModel.getRolePermissions(roleIdArray);
-
-        allUserPermissions.forEach((element) => {
-          element.forEach((item) => {
-            if (item.permission.type === "action") {
-              actionsArray.push(item.permission.name);
-            } else {
-              menusArray.push(item.permission.name);
-            }
-          });
-        });
 
         const userLoginInfo: UserLoginInfoInterface = {
           name: userInfo.firstName + " " + userInfo.lastName,
@@ -274,27 +252,6 @@ export const loginHandler = async (
           userEmail: userInfo.email,
           totpEnabled: userInfo.totpEnabled as boolean,
         };
-
-        const kolektSuperAdminLoginInfo: KolektSuperAdminLoginInfoInterface = {
-          name: userInfo.firstName + " " + userInfo.lastName,
-          role: rolesArray,
-          permissions: {
-            menus: menusArray,
-            actions: actionsArray,
-          },
-          accessToken: user.userInfo.tokens.accessToken,
-          refreshToken: user.userInfo.tokens.refreshToken,
-          userEmail: userInfo.email,
-          totpEnabled: userInfo.totpEnabled as boolean,
-        };
-
-        if (isUserKolektSuperAdmin) {
-          return successResponse(
-            res,
-            "login successful",
-            kolektSuperAdminLoginInfo,
-          );
-        }
 
         return successResponse(res, "login successful", userLoginInfo);
       } catch (error) {
@@ -415,37 +372,9 @@ export const loginHandler = async (
 
       const userRoles = await UserRoleModel.getUserRoles(userInfo.id);
 
-      const actionsArray: string[] = [];
-      const menusArray: string[] = [];
-      const rolesArray: string[] = [];
-      const roleIdArray: bigint[] = [];
-
       if (!userRoles || userRoles.length === 0) {
         return errorResponse(res, "No roles were assigned to this user", 404);
       }
-
-      userRoles.forEach((userRole) => {
-        if (userRole.role) {
-          rolesArray.push(userRole.role.name);
-        }
-
-        if (userRole.roleId) {
-          roleIdArray.push(userRole.roleId);
-        }
-      });
-
-      const allUserPermissions =
-        await RolePermissionModel.getRolePermissions(roleIdArray);
-
-      allUserPermissions.forEach((element) => {
-        element.forEach((item) => {
-          if (item.permission.type === "action") {
-            actionsArray.push(item.permission.name);
-          } else {
-            menusArray.push(item.permission.name);
-          }
-        });
-      });
 
       const userLoginInfo: UserLoginInfoInterface = {
         name: userInfo.firstName + " " + userInfo.lastName,
@@ -454,27 +383,6 @@ export const loginHandler = async (
         userEmail: userInfo.email,
         totpEnabled: userInfo.totpEnabled as boolean,
       };
-
-      const kolektSuperAdminLoginInfo: KolektSuperAdminLoginInfoInterface = {
-        name: userInfo.firstName + " " + userInfo.lastName,
-        role: rolesArray,
-        permissions: {
-          menus: menusArray,
-          actions: actionsArray,
-        },
-        accessToken: user.userInfo.tokens.accessToken,
-        refreshToken: user.userInfo.tokens.refreshToken,
-        userEmail: userInfo.email,
-        totpEnabled: userInfo.totpEnabled as boolean,
-      };
-
-      if (isUserKolektSuperAdmin) {
-        return successResponse(
-          res,
-          "login successful",
-          kolektSuperAdminLoginInfo,
-        );
-      }
 
       return successResponse(res, "login successful", userLoginInfo);
     } catch (error) {
@@ -536,6 +444,12 @@ export const authenticateRefreshTokenHandler = async (
     }
 
     if (!verification.tokenData.userId) {
+      return errorResponse(res, "Invalid refresh token!", 401);
+    }
+
+    // Users placed on leave, blocked (by an admin or automatically) or deleted since login cannot extend their session
+    if (!(await UserModel.canHoldSession(verification.tokenData.userId))) {
+      await TokenManager.revokeAllUserTokens(verification.tokenData.userId);
       return errorResponse(res, "Invalid refresh token!", 401);
     }
 
@@ -1011,240 +925,6 @@ export const emailLiveCheckHandler = async (
 
 /**
  * @swagger
- * /api/v1/admin/auth/register:
- *   post:
- *     summary: Register user
- *     description: |
- *       Handles the multi-step user registration process.
- *       step_1 creates the user and sends an OTP.
- *       step_2 creates the business.
- *       step_3 adds the business bank account.
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - stepper
- *             properties:
- *               stepper:
- *                 type: string
- *                 enum:
- *                   - step_1
- *                   - step_2
- *                   - step_3
- *                 example: step_1
- *               email:
- *                 type: string
- *                 format: email
- *                 example: user@example.com
- *                 description: Required for step_1.
- *               password:
- *                 type: string
- *                 format: password
- *                 example: Password123!
- *                 description: Required for step_1.
- *               firstName:
- *                 type: string
- *                 example: John
- *                 description: Required for step_1.
- *               lastName:
- *                 type: string
- *                 example: Doe
- *                 description: Required for step_1.
- *               userEmail:
- *                 type: string
- *                 format: email
- *                 example: user@example.com
- *                 description: Required for step_2.
- *               name:
- *                 type: string
- *                 example: Acme Ltd
- *                 description: Business name required for step_2.
- *               rcNumber:
- *                 type: string
- *                 example: RC123456
- *                 description: Business RC number required for step_2.
- *               businessId:
- *                 type: integer
- *                 example: 1
- *                 description: Required for step_3.
- *               walletId:
- *                 type: integer
- *                 example: 1
- *                 description: Required for step_3.
- *               bankName:
- *                 type: string
- *                 example: First Bank
- *                 description: Required for step_3.
- *               accountName:
- *                 type: string
- *                 example: John Doe
- *                 description: Required for step_3.
- *               accountNumber:
- *                 type: string
- *                 example: "0123456789"
- *                 description: Required for step_3.
- *     responses:
- *       200:
- *         description: Registration step completed successfully.
- *       400:
- *         description: Invalid request or user already exists.
- *       404:
- *         description: User or required resource not found.
- *       500:
- *         description: Unable to register user.
- *     security: []
- */
-export const registerUserWithKolektSuperAdminHandler = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const { ip } = extractRequestMetadata(req);
-
-    let request: ICreateUserDTO;
-    let serviceResponse: IServiceResponse;
-
-    const businessId = req.body.businessId;
-    // const walletId = req.body.walletId;
-    const stepper: string = req.body.stepper;
-
-    delete req.body.stepper;
-
-    switch (stepper.toLowerCase()) {
-      case "step_2": {
-        let request: ICreateBusinessDTO;
-        request = req.body;
-
-        const userId = await authenticateUserService(req.body.userEmail);
-
-        const finalRequest = {
-          ...request,
-          ipAddress: ip,
-          stepper: stepper,
-        };
-
-        serviceResponse = await createUserBusiness(finalRequest);
-
-        if (!userId) {
-          return errorResponse(
-            res,
-            "no user exists with this email address.",
-            404,
-          );
-        }
-
-        break;
-      }
-
-      case "step_3": {
-        // const addNewBankToBusinessData: any = {
-        //   walletId: Number(walletId),
-        //   businessId: Number(businessId),
-        //   bankName: req.body.bankName,
-        //   accountName: req.body.accountName,
-        //   accountNumber: Number(req.body.accountNumber),
-        // };
-
-        const fetchedUserId = await UserRoleModel.getUserIdByBusinessId(
-          Number(businessId),
-        );
-
-        try {
-          // await addNewBankToBusiness(addNewBankToBusinessData);
-
-          await UserModel.setOnboardStep(
-            fetchedUserId!,
-            stepper as onBoardTrackerType,
-          );
-
-          await AuditModel.logManagerBusinessBankCreated(fetchedUserId!, ip);
-
-          serviceResponse = {
-            success: true,
-            code: 200,
-            message: "New bank account added for business.",
-          };
-        } catch {
-          serviceResponse = {
-            success: false,
-            code: 500,
-            message: "Unable to add bank account to business.",
-          };
-        }
-
-        break;
-      }
-
-      default: {
-        request = req.body;
-
-        const firstCheckUserInfo = await authenticateUserService(request.email);
-
-        if (firstCheckUserInfo) {
-          return errorResponse(res, "User already exists on the db", 400);
-        }
-
-        try {
-          serviceResponse = await createUserBeforeOtpVerify(request);
-
-          interface OtpNotificationData {
-            otp: string;
-            email: string;
-            firstName: string;
-            lastName: string;
-          }
-
-          const fetchUserInfo = await authenticateUserService(request.email);
-
-          const generatedOtp = await OtpGenerator.generateAndStoreOtp(
-            request.email,
-          );
-
-          if (fetchUserInfo && generatedOtp) {
-            const otpData: OtpNotificationData = {
-              otp: generatedOtp,
-              email: fetchUserInfo.email,
-              firstName: fetchUserInfo.firstName,
-              lastName: fetchUserInfo.lastName,
-            };
-
-            await NotificationModel.sendOtpNotification(otpData);
-          }
-        } catch {
-          serviceResponse = {
-            success: false,
-            code: 500,
-            message: "Could not create user.",
-          };
-        }
-
-        break;
-      }
-    }
-
-    if (serviceResponse.success) {
-      return successResponse(
-        res,
-        serviceResponse.message,
-        serviceResponse.code,
-      );
-    }
-
-    return errorResponse(res, serviceResponse.message, serviceResponse.code);
-  } catch (error) {
-    console.log(error);
-
-    return errorResponse(res, "unable to register user", 500);
-  }
-};
-
-/**
- * @swagger
  * /api/v1/admin/auth/must-change-password:
  *   post:
  *     summary: Change default password
@@ -1353,127 +1033,6 @@ export const mustChangePasswordHandler = async (
     );
   } catch {
     return errorResponse(res, "Failed to reset password", 500);
-  }
-};
-
-/**
- * @swagger
- * /api/v1/admin/auth/verify-otp:
- *   post:
- *     summary: Verify registration OTP
- *     description: Verifies the OTP sent to the user's email during registration and updates the onboarding step to step_1.
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - otp
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: user@example.com
- *               otp:
- *                 type: string
- *                 pattern: '^[0-9]{6}$'
- *                 example: "482910"
- *     responses:
- *       200:
- *         description: OTP verified successfully.
- *       400:
- *         description: OTP verification failed.
- *       404:
- *         description: No user exists with this email.
- *       500:
- *         description: Failed to verify OTP.
- *     security: []
- */
-export const otpVerifyHandler = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const { email, otp } = req.body;
-
-  const stepper = "step_1" as onBoardTrackerType;
-
-  try {
-    const userInfo = await authenticateUserService(email);
-
-    if (!userInfo) {
-      return errorResponse(res, "No user exists with this email", 404);
-    }
-
-    const isOtpValid = await OtpGenerator.verify(userInfo.email, otp);
-
-    if (!isOtpValid) {
-      return errorResponse(res, "Verification of otp unsuccessful", 400);
-    }
-
-    await UserModel.setOnboardStep(userInfo.id, stepper);
-
-    return successResponse(res, "Verification of otp successful", 200);
-  } catch {
-    return errorResponse(res, "Failed to verify otp", 500);
-  }
-};
-
-/**
- * @swagger
- * /api/v1/admin/auth/resend-otp:
- *   post:
- *     summary: Resend OTP
- *     description: Retrieves the OTP associated with the provided email address and returns it.
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: user@example.com
- *     responses:
- *       200:
- *         description: OTP retrieved successfully.
- *       500:
- *         description: Failed to retrieve OTP.
- *     security: []
- */
-export const resendOtpHandler = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const { email } = req.body;
-
-  try {
-    const retrievedOtp = await NotificationModel.retrieveOtpFromDb(email);
-
-    if (!retrievedOtp) {
-      return errorResponse(
-        res,
-        "Failed to retrieve otp from notifications table on db",
-        500,
-      );
-    }
-
-    return successResponse(res, `${retrievedOtp} is the retrieved otp`, 200);
-  } catch {
-    return errorResponse(
-      res,
-      "Failed to retrieve otp from notifications table on db",
-      500,
-    );
   }
 };
 

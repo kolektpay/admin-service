@@ -1,5 +1,7 @@
-import { z } from "zod";
 import { StudentStatus } from "@prisma/client";
+import { z } from "zod";
+
+import { calendarDateSchema } from "./common.schema";
 
 export const MAX_STUDENTS_PER_BULK_REQUEST = 100;
 export const MAX_STUDENTS_PER_PAGE = 100;
@@ -70,7 +72,7 @@ export const bulkStudentRecordSchema = z.strictObject({
   middleName: editableStudentFields.middleName.optional(),
   registrationNumber: editableStudentFields.registrationNumber.optional(),
   avatar: editableStudentFields.avatar.optional(),
-  guardianId: idSchema,
+  guardianEmail: emailSchema,
   // Wallet provisioning details (sent to the payment service, not stored)
   city: z.string().trim().min(1).max(100),
   alias: z.string().trim().min(1).max(100).optional(),
@@ -126,19 +128,6 @@ export const STUDENT_SORT_FIELDS = [
   "registrationNumber",
   "age",
 ] as const;
-
-const calendarDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Dates must be in YYYY-MM-DD format" })
-  // Round-trip check rejects dates JS would silently roll over (e.g. 2026-02-30)
-  .refine(
-    (value) => {
-      const date = new Date(`${value}T00:00:00.000Z`);
-      return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
-    },
-    { message: "Invalid calendar date" },
-  )
-  .transform((value) => new Date(`${value}T00:00:00.000Z`));
 
 const ageSchema = z.coerce.number().int().min(1).max(100);
 

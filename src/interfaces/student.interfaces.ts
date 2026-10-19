@@ -1,3 +1,7 @@
+import { StudentStatus } from "@prisma/client";
+
+import { BulkStudentRecord } from "../validations/studentManagement.schema";
+
 export interface IStudentFormData {
   subclassId: number;
   age: number;
@@ -71,4 +75,33 @@ export interface IStudentResponseForAuth {
   mustChangePassword: boolean | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface StudentUniqueFields {
+  email?: string;
+  phoneNumber?: string;
+  registrationNumber?: string | null;
+}
+
+export interface StudentActor {
+  userId: string;
+  ip?: string;
+}
+
+export interface StudentStatusChangeResult {
+  studentId: bigint;
+  status: StudentStatus;
+  changed: boolean;
+}
+
+export interface PreparedStudent {
+  record: BulkStudentRecord;
+  guardianId: bigint;
+  temporaryPassword: string;
+  hashedPassword: string;
+}
+
+export interface WalletProvisioningResult {
+  created: number;
+  pending: { studentId: bigint; reason: string }[];
 }

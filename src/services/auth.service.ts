@@ -1,25 +1,46 @@
 import bcrypt from "bcrypt";
-import TokenManager from "../utils/token.manager";
 
-import { IUserResponse } from "../interfaces/user.interface";
-import { isPastDate } from "../helpers/date.helper";
 import { config } from "../config/app";
-import { AuditModel } from "../models/audit.model";
-import { UserModel } from "../models/user.model";
-import { NotificationModel } from "../models/notifications.model";
-
 import prisma from "../config/database";
+import { isPastDate } from "../helpers/date.helper";
+import { IUserResponse } from "../interfaces/user.interface";
+import TokenManager from "../managers/token.manager";
+import { AuditModel } from "../models/audit.model";
+import { NotificationModel } from "../models/notifications.model";
+import { UserModel } from "../models/user.model";
 import ApiError from "../utils/apiError";
 
 let support_email = config.supportEmail;
 const MAX_ATTEMPTS = 3;
 
+export const onLeaveLoginMessage = (expectedReturnDate?: Date | null): string =>
+  `Your account is on leave${
+    expectedReturnDate ? ` until ${expectedReturnDate.toISOString().slice(0, 10)}` : ""
+  }. Please contact your administrator.`;
+
+export const BLOCKED_BY_ADMIN_LOGIN_MESSAGE =
+  "Your account has been blocked by an administrator. Please contact your administrator.";
+
+/**
+ * Why login is refused for a status only an administrator can lift
+ * (on leave, blocked by admin), or null for any other status.
+ */
+export const adminHeldLoginMessage = (user: {
+  status: string;
+  expectedReturnDate?: Date | null;
+}): string | null => {
+  if (user.status === "on_leave") return onLeaveLoginMessage(user.expectedReturnDate);
+  if (user.status === "blocked_by_admin") return BLOCKED_BY_ADMIN_LOGIN_MESSAGE;
+  return null;
+};
+
+/** Find a user by email for sign-in flows. Deleted users are not found. */
 export const authenticateUserService = async (
   email: string,
 ): Promise<IUserResponse | null> => {
   try {
-    let user = await prisma.users.findUnique({
-      where: { email },
+    let user = await prisma.users.findFirst({
+      where: { email, deletedAt: null },
       select: {
         id: true,
         email: true,
@@ -37,6 +58,7 @@ export const authenticateUserService = async (
         totpSecret: true,
         totpRequired: true,
         mustChangePassword: true,
+        expectedReturnDate: true,
       },
     });
 
@@ -117,8 +139,16 @@ export const logInService = async (
       throw new ApiError(401, "Invalid login credentials");
     }
 
+    // Not counted as a failed attempt: an automatic block would replace
+    // the leave or admin block with one a password reset can clear
+    const heldMessage = adminHeldLoginMessage(user);
+    if (heldMessage) {
+      await AuditModel.logFailedLogin(user.id, ipaddress);
+      throw new ApiError(403, heldMessage);
+    }
+
     if (user.status !== "active") {
-  
+
       failed_login_count = await UserModel.incrementFailedLoginCount(
         user.id,
         failed_login_count,

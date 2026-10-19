@@ -1,41 +1,14 @@
 import { EmailStatus, Prisma } from "@prisma/client";
+
 import prisma from "../config/database";
-import { EmailUser } from "../utils/emailTemplate";
-// import { Emails } from "../utils/emailTemplate";
+import {
+  EmailUser,
+  LoginNotificationData,
+  MustChangePasswordNotificationData,
+  PasswordResetNotificationData,
+} from "../interfaces/notification.interface";
 
 // const email = Emails.getEmail("PAYMENT_SUCCESSFUL");
-
-interface LoginNotificationData {
-  email: string;
-  firstName: string;
-  lastName: string;
-  ipAddress?: string;
-  device?: string;
-  location?: string;
-  browser?: string;
-  os?: string;
-}
-
-interface PasswordResetNotificationData {
-  email: string;
-  fullName: string;
-  resetLink: string;
-}
-
-interface OtpNotificationData {
-  otp: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
-
-export interface MustChangePasswordNotificationData {
-  email: string;
-  firstName: string;
-  lastName: string;
-  generatedPassword: string;
-  resetLink: string;
-}
 
 export class NotificationModel {
   /**
@@ -53,38 +26,6 @@ export class NotificationModel {
         toRecipientAddress: data.email,
         toRecipientName: `${data.firstName} ${data.lastName}`,
 
-        type: "login_email",
-        status: EmailStatus.PENDING,
-      },
-    });
-  }
-
-  static async sendLoginNotificationForStudent(
-    data: LoginNotificationData,
-  ): Promise<void> {
-    const clientData = Object.values(data).join(",");
-    await prisma.notifications.create({
-      data: {
-        subject: "student_login_detected",
-        content: clientData,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
-        type: "login_email",
-        status: EmailStatus.PENDING,
-      },
-    });
-  }
-
-  static async sendLoginNotificationForGuardian(
-    data: LoginNotificationData,
-  ): Promise<void> {
-    const clientData = Object.values(data).join(",");
-    await prisma.notifications.create({
-      data: {
-        subject: "guardian_login_detected",
-        content: clientData,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
         type: "login_email",
         status: EmailStatus.PENDING,
       },
@@ -110,36 +51,23 @@ export class NotificationModel {
     });
   }
 
-  static async sendOtpNotification(data: OtpNotificationData): Promise<void> {
-    const otpData = Object.values(data).join(",");
-    await prisma.notifications.create({
-      data: {
-        subject: "Otp Notification on User creation",
-        content: otpData,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
-        type: "otp_email",
-        status: EmailStatus.PENDING,
-      },
-    });
-  }
-
-  static async sendTempPasswordNotification(
+  /**
+   * Build the pending notification row for a new administrator's temporary
+   * password, so callers can insert it inside their own transaction.
+   */
+  static buildTempPasswordNotification(
     data: MustChangePasswordNotificationData,
-  ): Promise<void> {
-    const mustChangeTemporaryPasswordData = Object.values(data).join(",");
-    await prisma.notifications.create({
-      data: {
-        subject:
-          "Temporary password generated after user creation that must be changed on login",
-        content: mustChangeTemporaryPasswordData,
-        toRecipientAddress: data.email,
-        toRecipientName: `${data.firstName} ${data.lastName}`,
-        type: "change_password_email",
+  ): Prisma.NotificationsCreateInput {
+    return {
+      subject:
+        "Temporary password generated after user creation that must be changed on login",
+      content: Object.values(data).join(","),
+      toRecipientAddress: data.email,
+      toRecipientName: `${data.firstName} ${data.lastName}`,
+      type: "change_password_email",
 
-        status: EmailStatus.PENDING,
-      },
-    });
+      status: EmailStatus.PENDING,
+    };
   }
 
   /**
@@ -159,14 +87,6 @@ export class NotificationModel {
 
       status: EmailStatus.PENDING,
     };
-  }
-
-  static async sendTempPasswordNotificationForStudents(
-    data: MustChangePasswordNotificationData,
-  ): Promise<void> {
-    await prisma.notifications.create({
-      data: NotificationModel.buildTempPasswordNotificationForStudents(data),
-    });
   }
 
   static async sendTempPasswordNotificationForGuardians(
@@ -189,16 +109,6 @@ export class NotificationModel {
     });
   }
 
-  static async retrieveOtpFromDb(email: string): Promise<string | null> {
-    const user = await prisma.notifications.findFirst({
-      where: { toRecipientAddress: email },
-      select: {
-        content: true,
-      },
-    });
-
-    return (user?.content as string) ?? null;
-  }
   static async getAllPersonnelWhoCanApprovePaymentItemsByBusinessId(
     businessId: bigint,
   ) {

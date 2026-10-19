@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { errorResponse } from "../utils/response.util";
-import TokenManager from "../utils/token.manager";
-import ApiError from "../utils/apiError";
+
 import prisma from "../config/database";
+import TokenManager from "../managers/token.manager";
+import ApiError from "../utils/apiError";
+import { errorResponse } from "../utils/response.util";
 
 export const authenticateJWT = async (
   req: Request,
@@ -72,15 +73,14 @@ export const requireManager = async (
       return errorResponse(res, "unauthorised", 401);
     }
 
-    let userRole = null;
+    let managerRole = null;
 
     try {
-      userRole = await prisma.userHasRole.findFirst({
+      // A user may hold several roles; any one of them being manager is enough
+      managerRole = await prisma.userHasRole.findFirst({
         where: {
           userId: userId as string,
-        },
-        include: {
-          role: true,
+          role: { name: "manager" },
         },
       });
     } catch (error) {
@@ -89,55 +89,8 @@ export const requireManager = async (
       }
     }
 
-    if (!userRole) {
-      return errorResponse(res, "unauthorised", 401);
-    }
-
-    if (userRole.role?.name !== "manager") {
+    if (!managerRole) {
       return errorResponse(res, "unauthorised. managers only", 403);
-    }
-
-    next();
-  } catch (error) {
-    console.log(error);
-  }
-};
-
-export const requireKolektSuperAdmin = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  const userId = req.userId;
-
-  try {
-    if (!userId) {
-      return errorResponse(res, "unauthorised", 401);
-    }
-
-    let userRole = null;
-
-    try {
-      userRole = await prisma.userHasRole.findFirst({
-        where: {
-          userId: userId as string,
-        },
-        include: {
-          role: true,
-        },
-      });
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return errorResponse(res, error.message, error.statusCode);
-      }
-    }
-
-    if (!userRole) {
-      return errorResponse(res, "unauthorised", 401);
-    }
-
-    if (userRole.role?.name !== "Kolekt-super-admin") {
-      return errorResponse(res, "unauthorised kolekt super admin only", 403);
     }
 
     next();
@@ -158,30 +111,14 @@ export const checkIfStaffHasStudentGuardianPermission = async (
       return errorResponse(res, "unauthorised", 401);
     }
 
-    let userRole = null;
-
-    try {
-      userRole = await prisma.userHasRole.findFirst({
-        where: {
-          userId: userId as string,
-        },
-        include: {
-          role: true,
-        },
-      });
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return errorResponse(res, error.message, error.statusCode);
-      }
-    }
-
-    if (!userRole) {
-      return errorResponse(res, "unauthorised", 401);
-    }
+    // Permissions from any of the user's roles count
+    const heldByUser = {
+      role: { userHasRoles: { some: { userId: userId as string } } },
+    };
 
     const hasPermission = await prisma.roleHasPermission.findFirst({
       where: {
-        roleId: userRole.roleId as bigint,
+        ...heldByUser,
         permission: {
           name: {
             startsWith: "admin.student_management.",
@@ -192,7 +129,7 @@ export const checkIfStaffHasStudentGuardianPermission = async (
 
     const hasGuardianPermission = await prisma.roleHasPermission.findFirst({
       where: {
-        roleId: userRole.roleId as bigint,
+        ...heldByUser,
         permission: {
           name: {
             startsWith: "admin.guardian_management.",
@@ -229,30 +166,10 @@ export const checkIfStaffHasPaymentItemApprovalPermission = async (
       return errorResponse(res, "unauthorised", 401);
     }
 
-    let userRole = null;
-
-    try {
-      userRole = await prisma.userHasRole.findFirst({
-        where: {
-          userId: userId as string,
-        },
-        include: {
-          role: true,
-        },
-      });
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return errorResponse(res, error.message, error.statusCode);
-      }
-    }
-
-    if (!userRole) {
-      return errorResponse(res, "unauthorised", 401);
-    }
-
+    // Permissions from any of the user's roles count
     const hasApprovalPermission = await prisma.roleHasPermission.findFirst({
       where: {
-        roleId: userRole.roleId as bigint,
+        role: { userHasRoles: { some: { userId: userId as string } } },
         permission: {
           name: "admin.payment_item.approve",
         },

@@ -1,12 +1,8 @@
-import TelegramBot from 'node-telegram-bot-api';
 import { Request } from 'express';
-import { extractRequestMetadata } from '../utils/request.metadata';
+import TelegramBot from 'node-telegram-bot-api';
 
-export interface TelegramLoggerConfig {
-  botToken: string;
-  chatId: string;
-  enabled: boolean;
-}
+import { TelegramLoggerConfig } from '../interfaces/telegramLogger.interface';
+import { extractRequestMetadata } from '../utils/request.metadata';
 
 export class TelegramLogger {
   private bot: TelegramBot;

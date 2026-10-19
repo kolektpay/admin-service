@@ -1,6 +1,7 @@
-import prisma from "../config/database";
-import { guardians } from "../utils/guardians";
 import bcrypt from "bcrypt";
+
+import prisma from "../config/database";
+import { guardians } from "./data/guardians";
 
 export const saltRounds: number = Number(process.env.SALT_ROUNDS) || 17;
 

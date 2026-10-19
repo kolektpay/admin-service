@@ -1,5 +1,6 @@
-import prisma from "../config/database";
 import bcrypt from "bcrypt";
+
+import prisma from "../config/database";
 
 const SALT_ROUNDS = 13;
 
