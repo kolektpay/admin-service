@@ -477,7 +477,7 @@ export const blockAdminHandler = async (
   );
   successResponse(
     res,
-    "Your user account has been blocked. Please contact system administrator.",
+    "Your user account has been blocked. Please contact the system administrator.",
   );
 };
 
