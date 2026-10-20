@@ -89,7 +89,18 @@ const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
  *       401:
  *         description: Invalid email or password
  *       403:
- *         description: Account is not authorized to log in
+ *         description: |
+ *           Account is not authorized to log in. With the correct password, a user on leave or
+ *           blocked by an administrator gets the reason, and only an administrator can lift it.
+ *           A wrong password gets the usual 401 instead, and these attempts never trigger the
+ *           automatic block.
+ *         content:
+ *           application/json:
+ *             examples:
+ *               onLeave:
+ *                 value: { success: false, message: "Your account is on leave until 2026-11-02. Please contact your administrator." }
+ *               blockedByAdmin:
+ *                 value: { success: false, message: "Your account has been blocked by an administrator. Please contact your administrator." }
  *       429:
  *         description: Too many login attempts
  *       500:
