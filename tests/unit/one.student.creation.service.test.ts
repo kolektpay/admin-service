@@ -242,16 +242,18 @@ describe("mapStudentUniqueViolation", () => {
 });
 
 describe("assertSubclassesExist", () => {
-  it("passes when every subclass exists, querying each id once", async () => {
+  it("passes when every subclass exists, querying each id once within the business", async () => {
     prisma.subclasses.findMany.mockResolvedValue([{ id: BigInt(1) }, { id: BigInt(2) }]);
-    await assertSubclassesExist([BigInt(1), BigInt(2), BigInt(1)], () => ["subclassId"]);
-    expect(prisma.subclasses.findMany.mock.calls[0][0].where.id.in).toEqual([BigInt(1), BigInt(2)]);
+    await assertSubclassesExist([BigInt(1), BigInt(2), BigInt(1)], businessId, () => ["subclassId"]);
+    const { where } = prisma.subclasses.findMany.mock.calls[0][0];
+    expect(where.id.in).toEqual([BigInt(1), BigInt(2)]);
+    expect(where.class).toEqual({ businessId });
   });
 
   it("throws 400 listing every field that references a missing subclass", async () => {
     prisma.subclasses.findMany.mockResolvedValue([{ id: BigInt(1) }]);
     const error = await expectAppError(
-      assertSubclassesExist([BigInt(1), BigInt(9)], (id) => [`a.${id}`, `b.${id}`]),
+      assertSubclassesExist([BigInt(1), BigInt(9)], businessId, (id) => [`a.${id}`, `b.${id}`]),
       400,
       "INVALID_SUBCLASS",
     );

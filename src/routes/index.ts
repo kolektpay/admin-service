@@ -2,6 +2,9 @@ import { Router } from "express";
 
 import { config } from "../config/app";
 import authRouter from "./auth/auth.routes";
+import classAssignmentRouter from "./class/classAssignment.routes";
+import classRouter from "./class/class.routes";
+import subclassRouter from "./class/subclass.routes";
 import adminGuardianRouter from "./guardian.routes/guardian.routes";
 import roleRouter from "./role/role.routes";
 import adminStudentRouter from "./student/student.routes";
@@ -18,6 +21,9 @@ router.use("/admin", roleRouter);
 
 router.use("/admin/students", adminStudentRouter);
 router.use("/admin/guardians", adminGuardianRouter);
+router.use("/admin/classes", classRouter);
+router.use("/admin/subclasses", subclassRouter);
+router.use("/admin/class-assignments", classAssignmentRouter);
 
 router.use("/admin/wallet", walletRouter);
 router.use("/admin/transactions", transactionsRouter);

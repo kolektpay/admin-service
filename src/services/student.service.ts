@@ -129,13 +129,15 @@ export const mapStudentUniqueViolation = (error: unknown): unknown => {
   ]);
 };
 
+/** Reject subclasses that do not exist or belong to another business's classes. */
 export const assertSubclassesExist = async (
   subclassIds: bigint[],
+  businessId: bigint,
   fieldPath: (subclassId: bigint) => string[],
 ): Promise<void> => {
   const uniqueIds = [...new Set(subclassIds)];
   const found = await prisma.subclasses.findMany({
-    where: { id: { in: uniqueIds } },
+    where: { id: { in: uniqueIds }, class: { businessId } },
     select: { id: true },
   });
   const foundIds = new Set(found.map((s) => s.id));
@@ -285,7 +287,7 @@ export const updateStudentById = async (
   if (conflicts.length) throw studentConflictError(conflicts);
 
   if (input.subclassId !== undefined) {
-    await assertSubclassesExist([input.subclassId], () => ["subclassId"]);
+    await assertSubclassesExist([input.subclassId], businessId, () => ["subclassId"]);
   }
 
   try {
@@ -561,6 +563,7 @@ const validateBatch = async (
   const guardianIds = await resolveGuardianIds(records, businessId);
   await assertSubclassesExist(
     records.map((r) => r.subclassId),
+    businessId,
     (subclassId) =>
       records.flatMap((r, index) =>
         r.subclassId === subclassId ? [studentField(index, "subclassId")] : [],

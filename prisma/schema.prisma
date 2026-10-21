@@ -183,6 +183,7 @@ model Businesses {
   updatedAt                        DateTime?                       @updatedAt @map("updated_at")
   deletedAt                        DateTime?                       @map("deleted_at")
   auditLogs                        AuditLogs[]
+  classes                          Classes[]
   type                             BusinessTypes?                  @relation(fields: [businessTypeId], references: [id], onDelete: Cascade)
   invoices                         Invoices[]
   paymentItems                     PaymentItems[]
@@ -270,7 +271,7 @@ model Students {
   PasswordHistory                  PasswordHistory[]
   student_guardian_has_permissions StudentGuardianHasPermissions[]
   business                         Businesses                      @relation(fields: [businessId], references: [id])
-  subclass                         Subclasses                      @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  subclass                         Subclasses                      @relation(fields: [subclassId], references: [id], onDelete: Restrict)
   students_has_wallets             StudentsHasWallets[]
   UserPasswordReset                UserPasswordReset[]
   tokens                           UserTokens[]
@@ -367,7 +368,7 @@ model Subclasses {
   updatedAt    DateTime              @updatedAt @map("updated_at")
   paymentItems PaymentItemSubclass[]
   students     Students[]
-  class        Classes               @relation(fields: [classId], references: [id])
+  class        Classes               @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([classId, name])
   @@map("subclasses")
@@ -375,12 +376,17 @@ model Subclasses {
 
 model Classes {
   id           BigInt         @id @default(autoincrement())
+  businessId   BigInt?         @map("business_id")
   name         String
   category     ClassCategory  @default(normal)
-  description  String
+  description  String?
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime?       @updatedAt @map("updated_at")
   paymentItems PaymentItems[]
   subclasses   Subclasses[]
+  business     Businesses?     @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
+  @@unique([businessId, name])
   @@map("classes")
 }
 
