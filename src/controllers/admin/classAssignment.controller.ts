@@ -3,13 +3,16 @@ import { Request, Response } from "express";
 import { AdminActor } from "../../interfaces/admin.interfaces";
 import {
   assignStudentToSubclass,
+  bulkAssignStudents,
   bulkTransferStudents,
   getStudentAssignment,
+  unassignStudent,
 } from "../../services/classAssignment.service";
 import { extractRequestMetadata } from "../../utils/request.metadata";
 import { successResponse } from "../../utils/response.util";
 import {
   AssignStudentInput,
+  BulkAssignStudentsInput,
   BulkTransferStudentsInput,
 } from "../../validations/classManagement.schema";
 
@@ -41,12 +44,16 @@ const studentIdParam = (req: Request) => req.params.studentId as unknown as bigi
  *             updatedAt: { type: string, format: date-time }
  *         class:
  *           type: object
+ *           nullable: true
+ *           description: null when the student is unassigned
  *           properties:
  *             id: { type: integer, example: 10 }
  *             name: { type: string, example: JSS 1 }
  *             category: { type: string, enum: [normal, ube] }
  *         subclass:
  *           type: object
+ *           nullable: true
+ *           description: null when the student is unassigned
  *           properties:
  *             id: { type: integer, example: 12 }
  *             name: { type: string, example: JSS 1A }
@@ -144,6 +151,107 @@ export const assignStudentHandler = async (req: Request, res: Response): Promise
     getActor(req),
   );
   successResponse(res, "Student assigned to subclass successfully", assignment);
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/class-assignments/students/{studentId}:
+ *   delete:
+ *     summary: Remove a student from their subclass
+ *     description: |
+ *       Leaves the student unassigned (class and subclass are null) until they are
+ *       assigned again. Fails with ASSIGNMENT_CONFLICT if another request changes the
+ *       student's subclass at the same time.
+ *       Requires the admin.class_management.assign_student permission.
+ *     tags:
+ *       - Class Assignments
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: studentId, required: true, schema: { type: integer }, example: 501 }
+ *     responses:
+ *       200:
+ *         description: Student unassigned — returns the assignment with class and subclass null
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Student removed from subclass successfully }
+ *                 data: { $ref: '#/components/schemas/StudentClassAssignment' }
+ *       401:
+ *         description: Unauthorized - Invalid or missing access token
+ *       403:
+ *         description: Missing permission
+ *       404:
+ *         description: Student not found in your business (STUDENT_NOT_FOUND)
+ *       409:
+ *         description: Already unassigned (STUDENT_NOT_ASSIGNED), or changed concurrently (ASSIGNMENT_CONFLICT)
+ */
+export const unassignStudentHandler = async (req: Request, res: Response): Promise<void> => {
+  const assignment = await unassignStudent(studentIdParam(req), getActor(req));
+  successResponse(res, "Student removed from subclass successfully", assignment);
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/class-assignments/students:
+ *   put:
+ *     summary: Assign selected students to a subclass
+ *     description: |
+ *       For the "Assign Students" action: the selected students may be in any subclass,
+ *       or unassigned, and all end up in the given one. Students already in it, graduated
+ *       or withdrawn students, and ids not found in your business are skipped and listed
+ *       with a reason. The assignment is a single all-or-nothing update.
+ *       Requires the admin.class_management.assign_student permission.
+ *     tags:
+ *       - Class Assignments
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [subclassId, studentIds]
+ *             properties:
+ *               subclassId: { type: integer, example: 12 }
+ *               studentIds:
+ *                 type: array
+ *                 items: { type: integer }
+ *                 minItems: 1
+ *                 maxItems: 1000
+ *                 description: Duplicates are ignored
+ *                 example: [501, 503, 506]
+ *     responses:
+ *       200:
+ *         description: Assignment completed
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: Students assigned to subclass successfully
+ *               data:
+ *                 destination: { id: 12, name: JSS 1A, class: { id: 10, name: JSS 1 } }
+ *                 assignedCount: 2
+ *                 assignedStudentIds: [503, 506]
+ *                 skippedCount: 1
+ *                 skipped:
+ *                   - { studentId: 501, reason: already_in_subclass }
+ *       400:
+ *         description: Validation failed (VALIDATION_ERROR)
+ *       401:
+ *         description: Unauthorized - Invalid or missing access token
+ *       403:
+ *         description: Missing permission
+ *       404:
+ *         description: Subclass not found in your business (SUBCLASS_NOT_FOUND)
+ */
+export const bulkAssignStudentsHandler = async (req: Request, res: Response): Promise<void> => {
+  const result = await bulkAssignStudents(req.body as BulkAssignStudentsInput, getActor(req));
+  successResponse(res, "Students assigned to subclass successfully", result);
 };
 
 /**

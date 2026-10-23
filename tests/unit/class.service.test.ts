@@ -64,7 +64,10 @@ describe("listClasses", () => {
     expect(args.where).toEqual({
       businessId: BUSINESS_ID,
       category: "normal",
-      name: { contains: "prim", mode: "insensitive" },
+      OR: [
+        { name: { contains: "prim", mode: "insensitive" } },
+        { subclasses: { some: { name: { contains: "prim", mode: "insensitive" } } } },
+      ],
     });
     expect(args).toMatchObject({ skip: 10, take: 10 });
     expect(result.pagination).toEqual({ page: 2, limit: 10, total: 21, totalPages: 3 });

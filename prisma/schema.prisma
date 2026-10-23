@@ -255,7 +255,7 @@ model Students {
   isWalletCreated                  Boolean                         @default(false) @map("is_wallet_created")
   email                            String                          @unique @map("email")
   phoneNumber                      String                          @unique @map("phone_number")
-  subclassId                       BigInt                          @map("subclass_id")
+  subclassId                       BigInt?                         @map("subclass_id")
   password                         String                          @map("password")
   mustChangePassword               Boolean?                        @map("must_change_password")
   failedLoginCount                 Int                             @default(0) @map("failed_login_count")
@@ -271,7 +271,7 @@ model Students {
   PasswordHistory                  PasswordHistory[]
   student_guardian_has_permissions StudentGuardianHasPermissions[]
   business                         Businesses                      @relation(fields: [businessId], references: [id])
-  subclass                         Subclasses                      @relation(fields: [subclassId], references: [id], onDelete: Restrict)
+  subclass                         Subclasses?                     @relation(fields: [subclassId], references: [id], onDelete: Restrict)
   students_has_wallets             StudentsHasWallets[]
   UserPasswordReset                UserPasswordReset[]
   tokens                           UserTokens[]

@@ -160,6 +160,16 @@ export const bulkTransferStudentsSchema = z
     path: ["destinationSubclassId"],
   });
 
+// Selected students may come from any subclass, or none
+export const bulkAssignStudentsSchema = z.strictObject({
+  subclassId: idSchema,
+  studentIds: z
+    .array(idSchema)
+    .min(1, { message: "Provide at least one student" })
+    .max(MAX_STUDENTS_PER_TRANSFER)
+    .transform((ids) => [...new Set(ids)]),
+});
+
 export type ListClassesQuery = z.infer<typeof listClassesQuerySchema>;
 export type CreateClassInput = z.infer<typeof createClassSchema>;
 export type UpdateClassInput = z.infer<typeof updateClassSchema>;
@@ -169,3 +179,4 @@ export type UpdateSubclassInput = z.infer<typeof updateSubclassSchema>;
 export type ListSubclassStudentsQuery = z.infer<typeof listSubclassStudentsQuerySchema>;
 export type AssignStudentInput = z.infer<typeof assignStudentSchema>;
 export type BulkTransferStudentsInput = z.infer<typeof bulkTransferStudentsSchema>;
+export type BulkAssignStudentsInput = z.infer<typeof bulkAssignStudentsSchema>;

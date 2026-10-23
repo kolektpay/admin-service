@@ -178,7 +178,13 @@ export const listClasses = async (businessId: bigint, query: ListClassesQuery) =
   const where: Prisma.ClassesWhereInput = {
     businessId,
     ...(category && { category }),
-    ...(search && { name: { contains: search, mode: "insensitive" } }),
+    // Subclass names match too, so "1A" finds JSS 1 in the classes table
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { subclasses: { some: { name: { contains: search, mode: "insensitive" } } } },
+      ],
+    }),
     ...(hasSubclasses !== undefined && {
       subclasses: hasSubclasses ? { some: {} } : { none: {} },
     }),

@@ -10,9 +10,11 @@ import prismaClient from "../../src/config/database";
 import { AppError } from "../../src/middleware/error.middleware";
 import {
   assignStudentToSubclass,
+  bulkAssignStudents,
   bulkTransferStudents,
   getStudentAssignment,
   listSubclassStudents,
+  unassignStudent,
 } from "../../src/services/classAssignment.service";
 import { prismaError } from "../helpers/fixtures";
 import { PrismaMock } from "../helpers/prismaMock";
@@ -61,6 +63,15 @@ describe("getStudentAssignment", () => {
     expect(result.class).toEqual({ id: BigInt(11), name: "JSS 2", category: "normal" });
     expect(result.subclass).toEqual({ id: JSS2A, name: "JSS 2A" });
     expect(result.student).not.toHaveProperty("subclass");
+  });
+
+  it("returns null class and subclass for an unassigned student", async () => {
+    prisma.students.findFirst.mockResolvedValue({ ...assignmentRow(), subclass: null });
+
+    const result = await getStudentAssignment(STUDENT_ID, BUSINESS_ID);
+
+    expect(result).toMatchObject({ class: null, subclass: null });
+    expect(result.student.id).toBe(STUDENT_ID);
   });
 
   it("throws 404 for a student outside the business or removed", async () => {
@@ -119,7 +130,7 @@ describe("assignStudentToSubclass", () => {
     expect(prisma.auditLogs.create.mock.calls[0][0].data.status).toBe(
       "student_subclass_assigned: student 501 from subclass 12 to 15",
     );
-    expect(result.subclass.id).toBe(JSS2A);
+    expect(result.subclass?.id).toBe(JSS2A);
   });
 
   it("rejects assigning a student to the subclass they are already in", async () => {
@@ -262,5 +273,144 @@ describe("bulkTransferStudents", () => {
       details: [{ field: "destinationSubclassId", message: "Subclass does not exist" }],
     });
     expect(prisma.students.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("assignStudentToSubclass for an unassigned student", () => {
+  it("assigns only if the student is still unassigned", async () => {
+    prisma.students.findFirst.mockResolvedValue({ id: STUDENT_ID, subclassId: null });
+    prisma.subclasses.findFirst.mockResolvedValue(summary(JSS2A, "JSS 2A"));
+    prisma.students.updateMany.mockResolvedValue({ count: 1 });
+    prisma.students.findUniqueOrThrow.mockResolvedValue(assignmentRow());
+
+    await assignStudentToSubclass(STUDENT_ID, { subclassId: JSS2A }, actor);
+
+    expect(prisma.students.updateMany.mock.calls[0][0].where.subclassId).toBeNull();
+    expect(prisma.auditLogs.create.mock.calls[0][0].data.status).toBe(
+      "student_subclass_assigned: student 501 from unassigned to 15",
+    );
+  });
+});
+
+describe("unassignStudent", () => {
+  it("clears the subclass only if the student is still in the one that was read", async () => {
+    prisma.students.findFirst.mockResolvedValue({ id: STUDENT_ID, subclassId: JSS1A });
+    prisma.students.updateMany.mockResolvedValue({ count: 1 });
+    prisma.students.findUniqueOrThrow.mockResolvedValue({ ...assignmentRow(), subclass: null });
+
+    const result = await unassignStudent(STUDENT_ID, actor);
+
+    expect(prisma.students.updateMany).toHaveBeenCalledWith({
+      where: { id: STUDENT_ID, businessId: BUSINESS_ID, deletedAt: null, subclassId: JSS1A },
+      data: { subclassId: null },
+    });
+    expect(prisma.auditLogs.create.mock.calls[0][0].data.status).toBe(
+      "student_subclass_unassigned: student 501 from subclass 12",
+    );
+    expect(result).toMatchObject({ class: null, subclass: null });
+  });
+
+  it("rejects a student who is already unassigned", async () => {
+    prisma.students.findFirst.mockResolvedValue({ id: STUDENT_ID, subclassId: null });
+    await expectAppError(unassignStudent(STUDENT_ID, actor), 409, "STUDENT_NOT_ASSIGNED");
+    expect(prisma.students.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("reports a conflict when another request moved the student first", async () => {
+    prisma.students.findFirst.mockResolvedValue({ id: STUDENT_ID, subclassId: JSS1A });
+    prisma.students.updateMany.mockResolvedValue({ count: 0 });
+    await expectAppError(unassignStudent(STUDENT_ID, actor), 409, "ASSIGNMENT_CONFLICT");
+    expect(prisma.auditLogs.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing student", async () => {
+    prisma.students.findFirst.mockResolvedValue(null);
+    await expectAppError(unassignStudent(STUDENT_ID, actor), 404, "STUDENT_NOT_FOUND");
+  });
+});
+
+describe("bulkAssignStudents", () => {
+  beforeEach(() => {
+    prisma.subclasses.findFirst.mockResolvedValue(summary(JSS1A, "JSS 1A"));
+  });
+
+  it("assigns students from any subclass or none and explains each one skipped", async () => {
+    prisma.students.findMany.mockResolvedValue([
+      { id: BigInt(1), subclassId: null, status: "active" },
+      { id: BigInt(2), subclassId: JSS2A, status: "active" },
+      { id: BigInt(3), subclassId: JSS1A, status: "active" },
+      { id: BigInt(4), subclassId: JSS2A, status: "withdrawn" },
+      { id: BigInt(6), subclassId: JSS2A, status: "active" },
+    ]);
+    // Student 6 was removed between the read and the update
+    prisma.students.updateManyAndReturn.mockResolvedValue([{ id: BigInt(1) }, { id: BigInt(2) }]);
+
+    const result = await bulkAssignStudents(
+      {
+        subclassId: JSS1A,
+        studentIds: [BigInt(1), BigInt(2), BigInt(3), BigInt(4), BigInt(5), BigInt(6)],
+      },
+      actor,
+    );
+
+    expect(prisma.students.updateManyAndReturn.mock.calls[0][0]).toEqual({
+      where: {
+        businessId: BUSINESS_ID,
+        deletedAt: null,
+        id: { in: [BigInt(1), BigInt(2), BigInt(6)] },
+        status: { notIn: ["graduated", "withdrawn"] },
+        OR: [{ subclassId: null }, { subclassId: { not: JSS1A } }],
+      },
+      data: { subclassId: JSS1A },
+      select: { id: true },
+    });
+    expect(result).toMatchObject({
+      assignedCount: 2,
+      assignedStudentIds: [BigInt(1), BigInt(2)],
+      skippedCount: 4,
+      skipped: [
+        { studentId: BigInt(3), reason: "already_in_subclass" },
+        { studentId: BigInt(4), reason: "ineligible_status" },
+        { studentId: BigInt(5), reason: "not_found" },
+        { studentId: BigInt(6), reason: "changed_concurrently" },
+      ],
+    });
+    expect(prisma.auditLogs.create.mock.calls[0][0].data.status).toBe(
+      "students_assigned: 2 to subclass 12",
+    );
+  });
+
+  it("writes nothing when none of the students can be assigned", async () => {
+    prisma.students.findMany.mockResolvedValue([
+      { id: BigInt(3), subclassId: JSS1A, status: "active" },
+    ]);
+
+    const result = await bulkAssignStudents({ subclassId: JSS1A, studentIds: [BigInt(3)] }, actor);
+
+    expect(prisma.students.updateManyAndReturn).not.toHaveBeenCalled();
+    expect(prisma.auditLogs.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ assignedCount: 0, skippedCount: 1 });
+  });
+
+  it("rejects a subclass outside the business before reading students", async () => {
+    prisma.subclasses.findFirst.mockResolvedValue(null);
+    await expectAppError(
+      bulkAssignStudents({ subclassId: JSS1A, studentIds: [BigInt(1)] }, actor),
+      404,
+      "SUBCLASS_NOT_FOUND",
+    );
+    expect(prisma.students.findMany).not.toHaveBeenCalled();
+  });
+
+  it("maps a subclass deleted mid-request to 404", async () => {
+    prisma.students.findMany.mockResolvedValue([
+      { id: BigInt(1), subclassId: null, status: "active" },
+    ]);
+    prisma.students.updateManyAndReturn.mockRejectedValue(prismaError("P2003"));
+    await expectAppError(
+      bulkAssignStudents({ subclassId: JSS1A, studentIds: [BigInt(1)] }, actor),
+      404,
+      "SUBCLASS_NOT_FOUND",
+    );
   });
 });
