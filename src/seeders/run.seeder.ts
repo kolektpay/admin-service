@@ -10,7 +10,6 @@ import prisma from "../config/database";
 // import { userHasRoleSeeder } from "./userHasRole.seeder";
 // import { studentsAndGuardiansHavePermissionsSeeder } from "./studentsAndGuardiansHavePermission.seedeer";
 // import { studentSeeder } from "./students.seeder";
-// import { subclassSeeder } from "./subclass.seeder";
 // import { seedGuardianHasStudents } from "./guardianHasStudents.seeder";
 
 export const runSeeders = async () => {
@@ -19,7 +18,6 @@ export const runSeeders = async () => {
   // await businessTypeSeeder();
   // await guardianSeeder();
   // await classSeeder();
-  // await subclassSeeder();
   // await roleSeeder();
   await rolesHasPermissionSeeder();
   // await studentSeeder();

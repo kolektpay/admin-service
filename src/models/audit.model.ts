@@ -693,6 +693,21 @@ export class AuditModel {
     });
   }
 
+  /** Class and subclass changes, e.g. "class_created: 4 (JSS 1)". */
+  static async logClassChange(
+    actor: AdminActor,
+    status: string,
+    db: DbClient = prisma,
+  ): Promise<void> {
+    await db.auditLogs.create({
+      data: {
+        ...auditActor(actor),
+        result: "success",
+        status,
+      },
+    });
+  }
+
   static async logRolePermissionsUpdated(
     actor: AdminActor,
     roleId: bigint,

@@ -75,6 +75,12 @@ export const PERMISSIONS = {
         type: "menu",
         category: "admin",
       },
+      {
+        name: "admin.menu.classmanagement",
+        description: "Access to class management",
+        type: "menu",
+        category: "admin",
+      },
     ],
     actions: [
       {
@@ -302,6 +308,36 @@ export const PERMISSIONS = {
       {
         name: "admin.role_management.delete_role",
         description: "Delete role",
+        type: "action",
+        category: "admin",
+      },
+      {
+        name: "admin.class_management.read_class",
+        description: "View classes and subclasses",
+        type: "action",
+        category: "admin",
+      },
+      {
+        name: "admin.class_management.create_class",
+        description: "Create classes and subclasses",
+        type: "action",
+        category: "admin",
+      },
+      {
+        name: "admin.class_management.update_class",
+        description: "Rename or edit classes and subclasses",
+        type: "action",
+        category: "admin",
+      },
+      {
+        name: "admin.class_management.delete_class",
+        description: "Delete classes and subclasses",
+        type: "action",
+        category: "admin",
+      },
+      {
+        name: "admin.class_management.assign_student",
+        description: "Assign and transfer students between subclasses",
         type: "action",
         category: "admin",
       },

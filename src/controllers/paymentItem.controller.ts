@@ -10,6 +10,7 @@ import { InvoiceModel } from "../models/invoices.model";
 import { NotificationModel } from "../models/notifications.model";
 import { PaymentItemModel } from "../models/paymentItem.model";
 import { UserModel } from "../models/user.model";
+import { classBelongsToBusiness } from "../services/class.service";
 import {
   createNewPaymentItemEntry,
   getAllPaymentItemsAccordingToBusinessIdAndCheckIfSearchAndStatusCriteriaexist,
@@ -215,6 +216,15 @@ export const createNewPaymentItemsAccordingToBusinessIdAndClassIdHandler =
     const businessId = req.businessId;
 
     try {
+      if (
+        !(await classBelongsToBusiness(
+          BigInt(beforeInvoiceNumberPaymentItemInfo.classId),
+          BigInt(businessId!),
+        ))
+      ) {
+        return errorResponse(res, "Class not found", 404);
+      }
+
       const getInvoiceNumber = await generateNextInvoiceNumber();
 
       const paymentItemCreator = await UserModel.getNameFromUserId(
