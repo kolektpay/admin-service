@@ -247,7 +247,7 @@ describe("assertSubclassesExist", () => {
     await assertSubclassesExist([BigInt(1), BigInt(2), BigInt(1)], businessId, () => ["subclassId"]);
     const { where } = prisma.subclasses.findMany.mock.calls[0][0];
     expect(where.id.in).toEqual([BigInt(1), BigInt(2)]);
-    expect(where.class).toEqual({ businessId });
+    expect(where.businessId).toBe(businessId);
   });
 
   it("throws 400 listing every field that references a missing subclass", async () => {

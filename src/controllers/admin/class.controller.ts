@@ -2,27 +2,22 @@ import { Request, Response } from "express";
 
 import { AdminActor } from "../../interfaces/admin.interfaces";
 import {
-  createClass,
   createSubclass,
-  deleteClass,
   deleteSubclass,
   getClass,
   getSubclass,
   listClasses,
   listSubclasses,
-  updateClass,
   updateSubclass,
 } from "../../services/class.service";
 import { listSubclassStudents } from "../../services/classAssignment.service";
 import { extractRequestMetadata } from "../../utils/request.metadata";
 import { successResponse } from "../../utils/response.util";
 import {
-  CreateClassInput,
   CreateSubclassInput,
   ListClassesQuery,
   ListSubclassesQuery,
   ListSubclassStudentsQuery,
-  UpdateClassInput,
   UpdateSubclassInput,
 } from "../../validations/classManagement.schema";
 
@@ -51,14 +46,14 @@ const subclassIdParam = (req: Request) => req.params.subclassId as unknown as bi
  *       properties:
  *         id: { type: integer, example: 10 }
  *         name: { type: string, example: JSS 1 }
- *         category: { type: string, enum: [normal, ube], example: normal }
+ *         category: { type: string, enum: [standardClass, technical, university, polytechnic, collegeOfEducation], example: standardClass }
  *         description: { type: string, nullable: true, example: Junior Secondary School year 1 }
- *         studentsCount: { type: integer, description: Active students across all subclasses, example: 84 }
+ *         studentsCount: { type: integer, description: Active students across your business's subclasses, example: 84 }
  *         createdAt: { type: string, format: date-time }
  *         updatedAt: { type: string, format: date-time }
  *         subclasses:
  *           type: array
- *           description: Empty for a class without subclasses
+ *           description: Your business's subclasses of this class; empty when you have none
  *           items: { $ref: '#/components/schemas/ClassSubclass' }
  *     Subclass:
  *       type: object
@@ -84,8 +79,11 @@ const subclassIdParam = (req: Request) => req.params.subclassId as unknown as bi
  * @swagger
  * /api/v1/admin/classes:
  *   get:
- *     summary: List your business's classes with their subclasses
- *     description: Requires the admin.class_management.read_class permission.
+ *     summary: List the global classes with your business's subclasses
+ *     description: |
+ *       Classes are shared by every business and managed by Kolekt, so they cannot be
+ *       created, edited or deleted through the API. Each class lists only your business's
+ *       subclasses. Requires the admin.class_management.read_class permission.
  *     tags:
  *       - Classes
  *     security:
@@ -93,9 +91,9 @@ const subclassIdParam = (req: Request) => req.params.subclassId as unknown as bi
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
- *       - { in: query, name: search, schema: { type: string }, description: Case-insensitive partial match on class name, example: jss }
- *       - { in: query, name: category, schema: { type: string, enum: [normal, ube] } }
- *       - { in: query, name: hasSubclasses, schema: { type: boolean }, description: Only classes with (true) or without (false) subclasses }
+ *       - { in: query, name: search, schema: { type: string }, description: Case-insensitive partial match on class name or one of your subclass names, example: jss }
+ *       - { in: query, name: category, schema: { type: string, enum: [standardClass, technical, university, polytechnic, collegeOfEducation] } }
+ *       - { in: query, name: hasSubclasses, schema: { type: boolean }, description: Only classes where your business has (true) or has no (false) subclasses }
  *     responses:
  *       200:
  *         description: Classes fetched
@@ -132,7 +130,7 @@ export const listClassesHandler = async (req: Request, res: Response): Promise<v
  * @swagger
  * /api/v1/admin/classes/{classId}:
  *   get:
- *     summary: Get one class with its subclasses
+ *     summary: Get one class with your business's subclasses
  *     description: Requires the admin.class_management.read_class permission.
  *     tags:
  *       - Classes
@@ -156,152 +154,11 @@ export const listClassesHandler = async (req: Request, res: Response): Promise<v
  *       403:
  *         description: Missing permission
  *       404:
- *         description: Class not found in your business (CLASS_NOT_FOUND)
+ *         description: Class not found (CLASS_NOT_FOUND)
  */
 export const getClassHandler = async (req: Request, res: Response): Promise<void> => {
   const found = await getClass(classIdParam(req), getActor(req).businessId);
   successResponse(res, "Class fetched successfully", found);
-};
-
-/**
- * @swagger
- * /api/v1/admin/classes:
- *   post:
- *     summary: Create a class, optionally with subclasses
- *     description: |
- *       The name must not match (case-insensitively) another of your business's classes.
- *       Subclasses are created only when listed; a class can have none.
- *       Requires the admin.class_management.create_class permission.
- *     tags:
- *       - Classes
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name: { type: string, maxLength: 50, example: JSS 1 }
- *               category: { type: string, enum: [normal, ube], default: normal }
- *               description: { type: string, maxLength: 255, example: Junior Secondary School year 1 }
- *               subclasses:
- *                 type: array
- *                 maxItems: 26
- *                 items: { type: string, maxLength: 50 }
- *                 example: [JSS 1A, JSS 1B, JSS 1C]
- *     responses:
- *       201:
- *         description: Class created
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: Class created successfully }
- *                 data: { $ref: '#/components/schemas/Class' }
- *       400:
- *         description: Validation failed (VALIDATION_ERROR)
- *       401:
- *         description: Unauthorized - Invalid or missing access token
- *       403:
- *         description: Missing permission
- *       409:
- *         description: Class name already in use (CLASS_NAME_TAKEN)
- */
-export const createClassHandler = async (req: Request, res: Response): Promise<void> => {
-  const created = await createClass(req.body as CreateClassInput, getActor(req));
-  successResponse(res, "Class created successfully", created, 201);
-};
-
-/**
- * @swagger
- * /api/v1/admin/classes/{classId}:
- *   patch:
- *     summary: Rename a class or change its category or description
- *     description: Requires the admin.class_management.update_class permission.
- *     tags:
- *       - Classes
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - { in: path, name: classId, required: true, schema: { type: integer }, example: 10 }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             minProperties: 1
- *             properties:
- *               name: { type: string, maxLength: 50, example: Basic 7 }
- *               category: { type: string, enum: [normal, ube] }
- *               description: { type: string, nullable: true, maxLength: 255, description: null clears it }
- *     responses:
- *       200:
- *         description: Class updated — returns the updated class
- *       400:
- *         description: Validation failed (VALIDATION_ERROR)
- *       401:
- *         description: Unauthorized - Invalid or missing access token
- *       403:
- *         description: Missing permission
- *       404:
- *         description: Class not found in your business (CLASS_NOT_FOUND)
- *       409:
- *         description: Class name already in use (CLASS_NAME_TAKEN)
- */
-export const updateClassHandler = async (req: Request, res: Response): Promise<void> => {
-  const updated = await updateClass(
-    classIdParam(req),
-    req.body as UpdateClassInput,
-    getActor(req),
-  );
-  successResponse(res, "Class updated successfully", updated);
-};
-
-/**
- * @swagger
- * /api/v1/admin/classes/{classId}:
- *   delete:
- *     summary: Delete a class and its subclasses
- *     description: |
- *       Refused while any student record (including removed students) is in one of its
- *       subclasses, or any payment item belongs to it.
- *       Requires the admin.class_management.delete_class permission.
- *     tags:
- *       - Classes
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - { in: path, name: classId, required: true, schema: { type: integer }, example: 10 }
- *     responses:
- *       200:
- *         description: Class deleted
- *         content:
- *           application/json:
- *             example: { success: true, message: Class deleted successfully }
- *       401:
- *         description: Unauthorized - Invalid or missing access token
- *       403:
- *         description: Missing permission
- *       404:
- *         description: Class not found in your business (CLASS_NOT_FOUND)
- *       409:
- *         description: Class still has students or payment items (CLASS_IN_USE)
- *         content:
- *           application/json:
- *             example:
- *               success: false
- *               code: CLASS_IN_USE
- *               message: This class is used by 84 student record(s) and 3 payment item(s). Move or remove them before deleting it.
- */
-export const deleteClassHandler = async (req: Request, res: Response): Promise<void> => {
-  await deleteClass(classIdParam(req), getActor(req));
-  successResponse(res, "Class deleted successfully");
 };
 
 // ==========================================
@@ -396,7 +253,7 @@ export const getSubclassHandler = async (req: Request, res: Response): Promise<v
  *   post:
  *     summary: Create a subclass under a class
  *     description: |
- *       The name must not match (case-insensitively) another subclass of the same class.
+ *       The name must not match (case-insensitively) another of your subclasses of the same class.
  *       Requires the admin.class_management.create_class permission.
  *     tags:
  *       - Subclasses
@@ -430,7 +287,7 @@ export const getSubclassHandler = async (req: Request, res: Response): Promise<v
  *       403:
  *         description: Missing permission
  *       404:
- *         description: Parent class not found in your business (CLASS_NOT_FOUND)
+ *         description: Parent class not found (CLASS_NOT_FOUND)
  *       409:
  *         description: The class already has a subclass with this name (SUBCLASS_NAME_TAKEN)
  */
@@ -445,8 +302,8 @@ export const createSubclassHandler = async (req: Request, res: Response): Promis
  *   patch:
  *     summary: Rename a subclass or move it under another class
  *     description: |
- *       Moving a subclass moves its students with it. The new class must belong to your
- *       business and must not already have a subclass with the same name. A subclass that
+ *       Moving a subclass moves its students with it. Your business must not already have
+ *       a subclass with the same name in the new class. A subclass that
  *       payment items are targeted at cannot change class.
  *       Requires the admin.class_management.update_class permission.
  *     tags:
@@ -475,7 +332,7 @@ export const createSubclassHandler = async (req: Request, res: Response): Promis
  *       403:
  *         description: Missing permission
  *       404:
- *         description: Subclass (SUBCLASS_NOT_FOUND) or new parent class (CLASS_NOT_FOUND) not found in your business
+ *         description: Subclass not found in your business (SUBCLASS_NOT_FOUND), or new parent class not found (CLASS_NOT_FOUND)
  *       409:
  *         description: Name already used in the target class (SUBCLASS_NAME_TAKEN), or payment items prevent a class change (SUBCLASS_HAS_PAYMENT_ITEMS)
  */

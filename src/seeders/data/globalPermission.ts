@@ -319,19 +319,19 @@ export const PERMISSIONS = {
       },
       {
         name: "admin.class_management.create_class",
-        description: "Create classes and subclasses",
+        description: "Create subclasses",
         type: "action",
         category: "admin",
       },
       {
         name: "admin.class_management.update_class",
-        description: "Rename or edit classes and subclasses",
+        description: "Rename or move subclasses",
         type: "action",
         category: "admin",
       },
       {
         name: "admin.class_management.delete_class",
-        description: "Delete classes and subclasses",
+        description: "Delete subclasses",
         type: "action",
         category: "admin",
       },

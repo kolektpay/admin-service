@@ -183,13 +183,13 @@ model Businesses {
   updatedAt                        DateTime?                       @updatedAt @map("updated_at")
   deletedAt                        DateTime?                       @map("deleted_at")
   auditLogs                        AuditLogs[]
-  classes                          Classes[]
   type                             BusinessTypes?                  @relation(fields: [businessTypeId], references: [id], onDelete: Cascade)
   invoices                         Invoices[]
   paymentItems                     PaymentItems[]
   roles                            Role[]
   student_guardian_has_permissions StudentGuardianHasPermissions[]
   students                         Students[]
+  subclasses                       Subclasses[]
   students_has_wallets             StudentsHasWallets[]
   userBusinesses                   UserBusiness[]
 
@@ -364,29 +364,31 @@ model Subclasses {
   id           BigInt                @id @default(autoincrement())
   name         String
   classId      BigInt                @map("class_id")
+  businessId   BigInt                @map("business_id")
   createdAt    DateTime              @default(now()) @map("created_at")
   updatedAt    DateTime              @updatedAt @map("updated_at")
   paymentItems PaymentItemSubclass[]
   students     Students[]
   class        Classes               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  business     Businesses            @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  @@unique([classId, name])
+  @@unique([classId, businessId, name])
+  @@index([businessId])
   @@map("subclasses")
 }
 
+// Classes are a global catalogue shared by every business, managed by the
+// seeder. Businesses own the subclasses they create under them.
 model Classes {
   id           BigInt         @id @default(autoincrement())
-  businessId   BigInt?         @map("business_id")
-  name         String
-  category     ClassCategory  @default(normal)
+  name         String         @unique
+  category     ClassCategory  @default(standardClass)
   description  String?
   createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime?       @updatedAt @map("updated_at")
+  updatedAt    DateTime?      @updatedAt @map("updated_at")
   paymentItems PaymentItems[]
   subclasses   Subclasses[]
-  business     Businesses?     @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  @@unique([businessId, name])
   @@map("classes")
 }
 
@@ -524,8 +526,11 @@ enum StudentStatus {
 }
 
 enum ClassCategory {
-  normal
-  ube
+  standardClass
+  technical
+  university
+  polytechnic
+  collegeOfEducation
 }
 
 enum PermissionsCategory {

@@ -4,7 +4,6 @@ import { z } from "zod";
 export const MAX_CLASSES_PER_PAGE = 100;
 export const MAX_SUBCLASSES_PER_PAGE = 100;
 export const MAX_STUDENTS_PER_PAGE = 100;
-export const MAX_SUBCLASSES_PER_CLASS = 26;
 export const MAX_STUDENTS_PER_TRANSFER = 1000;
 
 const idSchema = z.coerce
@@ -26,7 +25,7 @@ const booleanQuerySchema = z
   .transform((value) => value === "true");
 
 // Names are compared case-insensitively, so whitespace is collapsed to stop
-// "JSS 1" and "JSS  1" being treated as different classes.
+// "JSS 1A" and "JSS  1A" being treated as different subclasses.
 const nameSchema = (label: string, max: number) =>
   z
     .string()
@@ -39,13 +38,7 @@ const nameSchema = (label: string, max: number) =>
         .max(max, { message: `${label} name must not exceed ${max} characters` }),
     );
 
-export const classNameSchema = nameSchema("Class", 50);
 export const subclassNameSchema = nameSchema("Subclass", 50);
-
-const descriptionSchema = z
-  .string()
-  .trim()
-  .max(255, { message: "Description must not exceed 255 characters" });
 
 const atLeastOneField = (input: Record<string, unknown>) =>
   Object.values(input).some((value) => value !== undefined);
@@ -65,40 +58,6 @@ export const listClassesQuerySchema = z.object({
 export const classIdParamsSchema = z.object({
   classId: idParamSchema("classId"),
 });
-
-export const createClassSchema = z.strictObject({
-  name: classNameSchema,
-  category: z.enum(ClassCategory).default("normal"),
-  description: descriptionSchema.optional(),
-  // Only created when listed: classes do not need subclasses
-  subclasses: z
-    .array(subclassNameSchema)
-    .max(MAX_SUBCLASSES_PER_CLASS)
-    .default([])
-    .superRefine((names, ctx) => {
-      const seen = new Set<string>();
-      names.forEach((name, index) => {
-        const key = name.toLowerCase();
-        if (seen.has(key)) {
-          ctx.addIssue({
-            code: "custom",
-            path: [index],
-            message: `Subclass "${name}" is listed more than once`,
-          });
-        }
-        seen.add(key);
-      });
-    }),
-});
-
-export const updateClassSchema = z
-  .strictObject({
-    name: classNameSchema.optional(),
-    category: z.enum(ClassCategory).optional(),
-    // null clears the description
-    description: descriptionSchema.nullable().optional(),
-  })
-  .refine(atLeastOneField, { message: "Provide at least one field to update" });
 
 // ==========================================
 // Subclasses
@@ -171,8 +130,6 @@ export const bulkAssignStudentsSchema = z.strictObject({
 });
 
 export type ListClassesQuery = z.infer<typeof listClassesQuerySchema>;
-export type CreateClassInput = z.infer<typeof createClassSchema>;
-export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 export type ListSubclassesQuery = z.infer<typeof listSubclassesQuerySchema>;
 export type CreateSubclassInput = z.infer<typeof createSubclassSchema>;
 export type UpdateSubclassInput = z.infer<typeof updateSubclassSchema>;

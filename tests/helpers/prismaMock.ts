@@ -25,11 +25,8 @@ export const createPrismaMock = () => {
     },
     classes: {
       findMany: jest.fn(),
-      findFirst: jest.fn(),
+      findUnique: jest.fn(),
       count: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      deleteMany: jest.fn(),
     },
     guardians: { findMany: jest.fn() },
     guardianHasStudents: { createMany: jest.fn() },

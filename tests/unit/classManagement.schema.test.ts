@@ -1,41 +1,30 @@
 import {
   bulkTransferStudentsSchema,
   classIdParamsSchema,
-  createClassSchema,
+  createSubclassSchema,
   listClassesQuerySchema,
-  updateClassSchema,
   updateSubclassSchema,
 } from "../../src/validations/classManagement.schema";
 
-describe("createClassSchema", () => {
-  it("normalises names and creates no subclasses by default", () => {
-    expect(createClassSchema.parse({ name: "  JSS   1 " })).toEqual({
-      name: "JSS 1",
-      category: "normal",
-      subclasses: [],
+describe("createSubclassSchema", () => {
+  it("normalises names", () => {
+    expect(createSubclassSchema.parse({ classId: 4, name: "  JSS   1A " })).toEqual({
+      classId: BigInt(4),
+      name: "JSS 1A",
     });
   });
 
-  it("rejects subclass names repeated case-insensitively", () => {
-    const result = createClassSchema.safeParse({ name: "JSS 1", subclasses: ["JSS 1A", "jss 1a"] });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].path).toEqual(["subclasses", 1]);
-  });
-
   it("rejects unknown fields and blank names", () => {
-    expect(createClassSchema.safeParse({ name: "JSS 1", businessId: 2 }).success).toBe(false);
-    expect(createClassSchema.safeParse({ name: "   " }).success).toBe(false);
+    expect(createSubclassSchema.safeParse({ classId: 4, name: "A", businessId: 2 }).success).toBe(
+      false,
+    );
+    expect(createSubclassSchema.safeParse({ classId: 4, name: "   " }).success).toBe(false);
   });
 });
 
-describe("updateClassSchema / updateSubclassSchema", () => {
-  it("require at least one field", () => {
-    expect(updateClassSchema.safeParse({}).success).toBe(false);
+describe("updateSubclassSchema", () => {
+  it("requires at least one field", () => {
     expect(updateSubclassSchema.safeParse({}).success).toBe(false);
-  });
-
-  it("allow clearing a class description with null", () => {
-    expect(updateClassSchema.parse({ description: null })).toEqual({ description: null });
   });
 });
 
