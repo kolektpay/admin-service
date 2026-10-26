@@ -1,33 +1,22 @@
 import { Router } from "express";
 
-import {
-  createClassHandler,
-  deleteClassHandler,
-  getClassHandler,
-  listClassesHandler,
-  updateClassHandler,
-} from "../../controllers/admin/class.controller";
+import { getClassHandler, listClassesHandler } from "../../controllers/admin/class.controller";
 import { authenticateJWT } from "../../middleware/auth.middleware";
 import { validateRequest } from "../../middleware/validation.middleware";
 import { asyncHandler } from "../../utils/asyncHandler";
 import {
   classIdParamsSchema,
-  createClassSchema,
   listClassesQuerySchema,
-  updateClassSchema,
 } from "../../validations/classManagement.schema";
-import {
-  canCreateClasses,
-  canDeleteClasses,
-  canReadClasses,
-  canUpdateClasses,
-} from "./classPermissions";
+import { canReadClasses } from "./classPermissions";
 
 const router = Router();
 
 // ==========================================
 // Class Management Routes
 // ==========================================
+
+// Classes are a global catalogue managed by the seeder, so they are read-only here
 
 router.get(
   "/",
@@ -37,37 +26,12 @@ router.get(
   asyncHandler(listClassesHandler),
 );
 
-router.post(
-  "/",
-  authenticateJWT,
-  canCreateClasses,
-  validateRequest("body", createClassSchema),
-  asyncHandler(createClassHandler),
-);
-
 router.get(
   "/:classId",
   authenticateJWT,
   canReadClasses,
   validateRequest("params", classIdParamsSchema),
   asyncHandler(getClassHandler),
-);
-
-router.patch(
-  "/:classId",
-  authenticateJWT,
-  canUpdateClasses,
-  validateRequest("params", classIdParamsSchema),
-  validateRequest("body", updateClassSchema),
-  asyncHandler(updateClassHandler),
-);
-
-router.delete(
-  "/:classId",
-  authenticateJWT,
-  canDeleteClasses,
-  validateRequest("params", classIdParamsSchema),
-  asyncHandler(deleteClassHandler),
 );
 
 export default router;

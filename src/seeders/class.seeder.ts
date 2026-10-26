@@ -19,26 +19,19 @@ const DEFAULT_CLASSES = [
 ];
 
 /**
- * Gives every business that has no classes yet the default classes. No
- * subclasses are created: schools add them only where they need them.
- * Businesses that already have classes are left alone, so re-runs never
- * touch classes that schools have set up themselves.
+ * Seeds the global class catalogue shared by every business. This is the only
+ * way classes are created. No subclasses are created: each school adds its own
+ * only where it needs them. Existing classes are left alone, so re-runs only
+ * add classes that are missing.
  */
 export async function classSeeder() {
   try {
-    const businesses = await prisma.businesses.findMany({
-      where: { classes: { none: {} } },
-      select: { id: true },
+    const { count } = await prisma.classes.createMany({
+      data: DEFAULT_CLASSES,
+      skipDuplicates: true,
     });
 
-    for (const { id: businessId } of businesses) {
-      await prisma.classes.createMany({
-        data: DEFAULT_CLASSES.map((data) => ({ ...data, businessId })),
-        skipDuplicates: true,
-      });
-    }
-
-    console.log(`✅ Default classes seeded for ${businesses.length} business(es)!`);
+    console.log(`✅ Global classes seeded (${count} added)!`);
   } catch (error) {
     console.log(`❌ Error seeding classes: ${error}`);
   }

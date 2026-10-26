@@ -90,7 +90,7 @@ describe("listSubclassStudents", () => {
 
     expect(prisma.subclasses.findFirst.mock.calls[0][0].where).toEqual({
       id: JSS1A,
-      class: { businessId: BUSINESS_ID },
+      businessId: BUSINESS_ID,
     });
     expect(prisma.students.findMany.mock.calls[0][0].where).toEqual({
       businessId: BUSINESS_ID,

@@ -6,11 +6,9 @@ import { AdminActor } from "../interfaces/admin.interfaces";
 import { AppError } from "../middleware/error.middleware";
 import { AuditModel } from "../models/audit.model";
 import {
-  CreateClassInput,
   CreateSubclassInput,
   ListClassesQuery,
   ListSubclassesQuery,
-  UpdateClassInput,
   UpdateSubclassInput,
 } from "../validations/classManagement.schema";
 
@@ -30,15 +28,21 @@ const nestedSubclassSelect = {
   ...studentsCountSelect,
 } satisfies Prisma.SubclassesSelect;
 
-const classSelect = {
-  id: true,
-  name: true,
-  category: true,
-  description: true,
-  createdAt: true,
-  updatedAt: true,
-  subclasses: { select: nestedSubclassSelect, orderBy: [{ name: "asc" }, { id: "asc" }] },
-} satisfies Prisma.ClassesSelect;
+// Classes are global; only the business's own subclasses are nested under them
+const classSelect = (businessId: bigint) =>
+  ({
+    id: true,
+    name: true,
+    category: true,
+    description: true,
+    createdAt: true,
+    updatedAt: true,
+    subclasses: {
+      where: { businessId },
+      select: nestedSubclassSelect,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    },
+  }) satisfies Prisma.ClassesSelect;
 
 const subclassSelect = {
   id: true,
@@ -51,7 +55,7 @@ const subclassSelect = {
 } satisfies Prisma.SubclassesSelect;
 
 type NestedSubclassRow = Prisma.SubclassesGetPayload<{ select: typeof nestedSubclassSelect }>;
-type ClassRow = Prisma.ClassesGetPayload<{ select: typeof classSelect }>;
+type ClassRow = Prisma.ClassesGetPayload<{ select: ReturnType<typeof classSelect> }>;
 type SubclassRow = Prisma.SubclassesGetPayload<{ select: typeof subclassSelect }>;
 
 const withStudentsCount = <T extends NestedSubclassRow | SubclassRow>({
@@ -99,11 +103,6 @@ export const subclassNotFoundError = (field?: string) =>
     field ? [{ field, message: "Subclass does not exist" }] : undefined,
   );
 
-const classNameTakenError = () =>
-  new AppError("A class with this name already exists", 409, "CLASS_NAME_TAKEN", [
-    { field: "name", message: "A class with this name already exists" },
-  ]);
-
 const subclassNameTakenError = () =>
   new AppError(
     "This class already has a subclass with this name",
@@ -113,88 +112,87 @@ const subclassNameTakenError = () =>
   );
 
 // Soft-deleted students still hold their subclass, so they count as usage
-const inUseMessage = (what: string, students: number, paymentItems: number) => {
+const subclassInUseError = (students = 0, paymentItems = 0) => {
   const uses = [
     ...(students ? [`${students} student record(s)`] : []),
     ...(paymentItems ? [`${paymentItems} payment item(s)`] : []),
   ];
-  return uses.length
-    ? `This ${what} is used by ${uses.join(" and ")}. Move or remove them before deleting it.`
-    : `This ${what} is in use. Move or remove its students and payment items before deleting it.`;
+  return new AppError(
+    uses.length
+      ? `This subclass is used by ${uses.join(" and ")}. Move or remove them before deleting it.`
+      : "This subclass is in use. Move or remove its students and payment items before deleting it.",
+    409,
+    "SUBCLASS_IN_USE",
+  );
 };
 
-const classInUseError = (students = 0, paymentItems = 0) =>
-  new AppError(inUseMessage("class", students, paymentItems), 409, "CLASS_IN_USE");
-
-const subclassInUseError = (students = 0, paymentItems = 0) =>
-  new AppError(inUseMessage("subclass", students, paymentItems), 409, "SUBCLASS_IN_USE");
-
-const findClassNameConflict = (businessId: bigint, name: string, excludeClassId?: bigint) =>
-  prisma.classes.findFirst({
-    where: {
-      businessId,
-      name: { equals: name, mode: "insensitive" },
-      ...(excludeClassId !== undefined && { id: { not: excludeClassId } }),
-    },
-    select: { id: true },
-  });
-
-const findSubclassNameConflict = (classId: bigint, name: string, excludeSubclassId?: bigint) =>
+// Names only clash with the business's own subclasses of the class
+const findSubclassNameConflict = (
+  classId: bigint,
+  businessId: bigint,
+  name: string,
+  excludeSubclassId?: bigint,
+) =>
   prisma.subclasses.findFirst({
     where: {
       classId,
+      businessId,
       name: { equals: name, mode: "insensitive" },
       ...(excludeSubclassId !== undefined && { id: { not: excludeSubclassId } }),
     },
     select: { id: true },
   });
 
-const findOwnClass = (classId: bigint, businessId: bigint) =>
-  prisma.classes.findFirst({
-    where: { id: classId, businessId },
+const findClass = (classId: bigint) =>
+  prisma.classes.findUnique({
+    where: { id: classId },
     select: { id: true, name: true },
   });
 
-/** Subclasses are owned through their class's business. */
+/** Subclasses belong to the business that created them. */
 export const ownSubclassWhere = (
   subclassId: bigint,
   businessId: bigint,
-): Prisma.SubclassesWhereInput => ({ id: subclassId, class: { businessId } });
+): Prisma.SubclassesWhereInput => ({ id: subclassId, businessId });
 
-/** Whether the class exists and belongs to the business. */
-export const classBelongsToBusiness = async (
-  classId: bigint,
-  businessId: bigint,
-): Promise<boolean> => (await findOwnClass(classId, businessId)) !== null;
+/** Whether the class exists. Classes are global, so every business can use any of them. */
+export const classExists = async (classId: bigint): Promise<boolean> =>
+  (await findClass(classId)) !== null;
 
 // ==========================================
 // Classes
 // ==========================================
 
-/** List the business's classes, each with its subclasses and student counts. */
+/**
+ * List the global classes, each with the business's own subclasses and
+ * student counts.
+ */
 export const listClasses = async (businessId: bigint, query: ListClassesQuery) => {
   const { page, limit, search, category, hasSubclasses } = query;
 
   const where: Prisma.ClassesWhereInput = {
-    businessId,
     ...(category && { category }),
-    // Subclass names match too, so "1A" finds JSS 1 in the classes table
+    // The business's subclass names match too, so "1A" finds JSS 1 in the classes table
     ...(search && {
       OR: [
         { name: { contains: search, mode: "insensitive" } },
-        { subclasses: { some: { name: { contains: search, mode: "insensitive" } } } },
+        {
+          subclasses: {
+            some: { businessId, name: { contains: search, mode: "insensitive" } },
+          },
+        },
       ],
     }),
     ...(hasSubclasses !== undefined && {
-      subclasses: hasSubclasses ? { some: {} } : { none: {} },
+      subclasses: hasSubclasses ? { some: { businessId } } : { none: { businessId } },
     }),
   };
 
   const [classes, total] = await Promise.all([
     prisma.classes.findMany({
       where,
-      select: classSelect,
-      // Insertion order keeps classes in the order schools set them up (JSS 1 → SS 3)
+      select: classSelect(businessId),
+      // Insertion order keeps classes in the order they were seeded (JSS 1 → SS 3)
       orderBy: { id: "asc" },
       skip: (page - 1) * limit,
       take: limit,
@@ -206,135 +204,12 @@ export const listClasses = async (businessId: bigint, query: ListClassesQuery) =
 };
 
 export const getClass = async (classId: bigint, businessId: bigint): Promise<ClassRecord> => {
-  const found = await prisma.classes.findFirst({
-    where: { id: classId, businessId },
-    select: classSelect,
+  const found = await prisma.classes.findUnique({
+    where: { id: classId },
+    select: classSelect(businessId),
   });
   if (!found) throw classNotFoundError();
   return toClassRecord(found);
-};
-
-/**
- * Create a class for the actor's business. Subclasses are created only when
- * listed. Names must be unique (case-insensitively) within the business.
- */
-export const createClass = async (
-  input: CreateClassInput,
-  actor: AdminActor,
-): Promise<ClassRecord> => {
-  if (await findClassNameConflict(actor.businessId, input.name)) throw classNameTakenError();
-
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const created = await tx.classes.create({
-        data: {
-          businessId: actor.businessId,
-          name: input.name,
-          category: input.category,
-          description: input.description || null,
-          ...(input.subclasses.length && {
-            subclasses: {
-              createMany: { data: input.subclasses.map((name) => ({ name })) },
-            },
-          }),
-        },
-        select: classSelect,
-      });
-      await AuditModel.logClassChange(
-        actor,
-        `class_created: ${created.id} (${created.name})`,
-        tx,
-      );
-      return toClassRecord(created);
-    });
-  } catch (error) {
-    // Lost a race with a concurrent request creating the same name
-    if (isPrismaErrorCode(error, "P2002")) throw classNameTakenError();
-    throw error;
-  }
-};
-
-export const updateClass = async (
-  classId: bigint,
-  input: UpdateClassInput,
-  actor: AdminActor,
-): Promise<ClassRecord> => {
-  const existing = await findOwnClass(classId, actor.businessId);
-  if (!existing) throw classNotFoundError();
-
-  if (input.name && (await findClassNameConflict(actor.businessId, input.name, classId))) {
-    throw classNameTakenError();
-  }
-
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const updated = await tx.classes.update({
-        where: { id: classId },
-        data: {
-          name: input.name,
-          category: input.category,
-          description: input.description === "" ? null : input.description,
-        },
-        select: classSelect,
-      });
-      const renamed = updated.name !== existing.name ? `, renamed from ${existing.name}` : "";
-      await AuditModel.logClassChange(
-        actor,
-        `class_updated: ${classId} (${updated.name})${renamed}`,
-        tx,
-      );
-      return toClassRecord(updated);
-    });
-  } catch (error) {
-    if (isPrismaErrorCode(error, "P2002")) throw classNameTakenError();
-    throw error;
-  }
-};
-
-/**
- * Delete a class and its subclasses. Refused while any student (including a
- * soft-deleted one) is in one of its subclasses or any payment item uses it.
- */
-export const deleteClass = async (classId: bigint, actor: AdminActor): Promise<void> => {
-  const existing = await prisma.classes.findFirst({
-    where: { id: classId, businessId: actor.businessId },
-    select: {
-      id: true,
-      name: true,
-      _count: { select: { paymentItems: true } },
-    },
-  });
-  if (!existing) throw classNotFoundError();
-
-  const students = await prisma.students.count({ where: { subclass: { classId } } });
-  if (students > 0 || existing._count.paymentItems > 0) {
-    throw classInUseError(students, existing._count.paymentItems);
-  }
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      // Re-checked in the delete itself so a student or payment item added
-      // after the check above blocks the delete instead of racing it
-      const { count } = await tx.classes.deleteMany({
-        where: {
-          id: classId,
-          businessId: actor.businessId,
-          paymentItems: { none: {} },
-          subclasses: { none: { students: { some: {} } } },
-        },
-      });
-      if (count === 0) throw classInUseError();
-
-      await AuditModel.logClassChange(
-        actor,
-        `class_deleted: ${classId} (${existing.name})`,
-        tx,
-      );
-    });
-  } catch (error) {
-    if (isPrismaErrorCode(error, "P2003")) throw classInUseError();
-    throw error;
-  }
 };
 
 // ==========================================
@@ -346,7 +221,7 @@ export const listSubclasses = async (businessId: bigint, query: ListSubclassesQu
   const { page, limit, classId, search } = query;
 
   const where: Prisma.SubclassesWhereInput = {
-    class: { businessId },
+    businessId,
     ...(classId !== undefined && { classId }),
     ...(search && { name: { contains: search, mode: "insensitive" } }),
   };
@@ -384,15 +259,17 @@ export const createSubclass = async (
   input: CreateSubclassInput,
   actor: AdminActor,
 ): Promise<SubclassRecord> => {
-  const parent = await findOwnClass(input.classId, actor.businessId);
+  const parent = await findClass(input.classId);
   if (!parent) throw classNotFoundError("classId");
 
-  if (await findSubclassNameConflict(input.classId, input.name)) throw subclassNameTakenError();
+  if (await findSubclassNameConflict(input.classId, actor.businessId, input.name)) {
+    throw subclassNameTakenError();
+  }
 
   try {
     return await prisma.$transaction(async (tx) => {
       const created = await tx.subclasses.create({
-        data: { classId: input.classId, name: input.name },
+        data: { classId: input.classId, businessId: actor.businessId, name: input.name },
         select: subclassSelect,
       });
       await AuditModel.logClassChange(
@@ -409,7 +286,7 @@ export const createSubclass = async (
 };
 
 /**
- * Rename a subclass and/or move it under another of the business's classes.
+ * Rename a subclass and/or move it under another class.
  * Its students move with it. A subclass that payment items are targeted at
  * cannot change class, since those items belong to the current class.
  */
@@ -433,7 +310,7 @@ export const updateSubclass = async (
   const changingClass = targetClassId !== existing.classId;
 
   if (changingClass) {
-    if (!(await classBelongsToBusiness(targetClassId, actor.businessId))) {
+    if (!(await classExists(targetClassId))) {
       throw classNotFoundError("classId");
     }
     if (existing._count.paymentItems > 0) {
@@ -449,7 +326,7 @@ export const updateSubclass = async (
   const targetName = input.name ?? existing.name;
   if (
     (changingClass || input.name !== undefined) &&
-    (await findSubclassNameConflict(targetClassId, targetName, subclassId))
+    (await findSubclassNameConflict(targetClassId, actor.businessId, targetName, subclassId))
   ) {
     throw subclassNameTakenError();
   }

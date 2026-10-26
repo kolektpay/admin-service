@@ -76,7 +76,7 @@ export const listStudentsHandler = async (
     getBusinessId(req),
     req.query as unknown as ListStudentsQuery,
   );
-  successResponse(res, "Students fetched successfully", result);
+  successResponse(res, "Students fetched successfully.", result);
 };
 
 /**
