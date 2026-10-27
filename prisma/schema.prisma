@@ -364,13 +364,13 @@ model Subclasses {
   id           BigInt                @id @default(autoincrement())
   name         String
   classId      BigInt                @map("class_id")
-  businessId   BigInt                @map("business_id")
+  businessId   BigInt?                @map("business_id")
   createdAt    DateTime              @default(now()) @map("created_at")
   updatedAt    DateTime              @updatedAt @map("updated_at")
   paymentItems PaymentItemSubclass[]
   students     Students[]
   class        Classes               @relation(fields: [classId], references: [id], onDelete: Cascade)
-  business     Businesses            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Businesses?            @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([classId, businessId, name])
   @@index([businessId])
@@ -526,6 +526,8 @@ enum StudentStatus {
 }
 
 enum ClassCategory {
+  normal
+  ube
   standardClass
   technical
   university
