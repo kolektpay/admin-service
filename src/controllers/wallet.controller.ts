@@ -17,10 +17,17 @@ import {
 } from "../thirdPartyService/wallet.services";
 import { extractRequestMetadata } from "../utils/request.metadata";
 import { successResponse, errorResponse } from "../utils/response.util";
+import {
+  createWallet,
+  getPaymentItemWallet,
+  searchWallets,
+} from "../thirdPartyService/wallet.services";
+import { sendPaymentServiceResult } from "../utils/paymentServiceResponse.util";
+import { PaymentItemWalletParams, WalletSearchQuery } from "../validations/wallet.schema";
 
 /**
  * @swagger
- * /api/v1/wallet:
+ * /api/v1/admin/wallet:
  *   get:
  *     summary: Get wallet details on login
  *     description: Returns wallet details for the logged in user's business. Business ID is derived automatically from the user's JWT token.
@@ -609,4 +616,114 @@ export const getSpecificStudentWalletAccordingToBusinessIdHandler = async (
     console.log(error);
     return errorResponse(res, "Failed to fetch student wallet info.", 500);
   }
+};
+// ==========================================
+// Wallet service handlers
+// ==========================================
+
+/**
+ * @swagger
+ * /api/v1/admin/wallet/create:
+ *   post:
+ *     summary: Create the business wallet
+ *     description: Creates a wallet for the logged in user's business, or returns the existing one. Business ID comes from the JWT, so no body is needed.
+ *     tags:
+ *       - Wallet
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Wallet created or existing wallet returned
+ *       403:
+ *         description: Missing admin.menu.wallets permission
+ *       502:
+ *         description: Wallet service request failed
+ */
+export const createBusinessWalletHandler = async (req: Request, res: Response): Promise<void> => {
+  const result = await createWallet(String(req.userId), Number(req.businessId));
+
+  return sendPaymentServiceResult(
+    res,
+    result,
+    "Wallet created successfully",
+    "Could not create wallet",
+  );
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/wallet/search:
+ *   get:
+ *     summary: Search wallets
+ *     description: Searches wallet name, account number or wallet ID (exact UUID). Returns at most 20 results.
+ *     tags:
+ *       - Wallet
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "9710005607"
+ *     responses:
+ *       200:
+ *         description: Matching wallets returned
+ *       400:
+ *         description: Invalid query parameter
+ *       403:
+ *         description: Missing admin.menu.wallets permission
+ *       502:
+ *         description: Wallet service request failed
+ */
+export const searchWalletsHandler = async (req: Request, res: Response): Promise<void> => {
+  const { q } = req.query as unknown as WalletSearchQuery;
+  const result = await searchWallets(q);
+
+  return sendPaymentServiceResult(
+    res,
+    result,
+    "Wallets retrieved successfully",
+    "Could not search wallets",
+  );
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/wallet/payment-wallet/{paymentItemId}:
+ *   get:
+ *     summary: Get a payment item wallet
+ *     description: Returns the wallet for a payment item in the logged in user's business. Business ID comes from the JWT.
+ *     tags:
+ *       - Wallet
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: paymentItemId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *     responses:
+ *       200:
+ *         description: Payment item wallet retrieved successfully
+ *       400:
+ *         description: Invalid paymentItemId
+ *       403:
+ *         description: Missing admin.menu.wallets permission
+ *       502:
+ *         description: Wallet service request failed (including wallet not found)
+ */
+export const getPaymentItemWalletHandler = async (req: Request, res: Response): Promise<void> => {
+  const { paymentItemId } = req.params as unknown as PaymentItemWalletParams;
+  const result = await getPaymentItemWallet(req.businessId!, paymentItemId);
+
+  return sendPaymentServiceResult(
+    res,
+    result,
+    "Payment item wallet retrieved successfully",
+    "Could not retrieve payment item wallet",
+  );
 };

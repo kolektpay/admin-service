@@ -9,13 +9,13 @@ import {
 } from "../interfaces/wallet.interfaces";
 import { BaseProvider} from "../providers/base.provider";
 import { PaymentServiceEndpoints } from "../providers/paymentservice.endpoints";
+import { WalletTransactionHistoryQuery } from "../validations/transaction.schema";
+import { buildQueryString } from "./paymentService.query";
+import { getTransactionByReference, getWalletTransactions } from "./transactions.services";
 dotenv.config();
 
 const api_key = process.env.API_KEY;
 const payment_service_base_url = process.env.PAYMENT_SERVICE_BASE_URL;
-const get_wallet_transaction_history_url = process.env.GET_ALL_TRANSACTIONS;
-const get_specific_wallet_transaction_history_url =
-  process.env.GET_A_SPECIFIC_TRANSACTION;
 
 class WalletProvider extends BaseProvider {
   constructor() {
@@ -78,6 +78,27 @@ class WalletProvider extends BaseProvider {
       paymentItemWalletCreationInfo,
     );
   }
+
+  // GET /wallet/payment-wallet/{businessId}/{paymentItemId}
+  getPaymentItemWallet(
+    businessId: string | number | bigint,
+    paymentItemId: string | number | bigint,
+  ) {
+    return this.makeRequest(
+      `${PaymentServiceEndpoints.CREATE_A_PAYMENT_ITEM_WALLET}/${encodeURIComponent(String(businessId))}/${encodeURIComponent(String(paymentItemId))}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  // GET /wallet/search?q - matches wallet_name, account_no or wallet_id (max 20 results)
+  searchWallets(searchTerm: string) {
+    return this.makeRequest(
+      `${PaymentServiceEndpoints.GET_WALLET_DETAILS}/search${buildQueryString({ q: searchTerm })}`,
+      undefined,
+      "GET",
+    );
+  }
 }
 
 const walletProvider = new WalletProvider();
@@ -127,34 +148,37 @@ export const createPaymentItemWallet = async (
   return walletProvider.createPaymentItemWallet(paymentItemWalletCreationInfo);
 };
 
+// Both calls go through TransactionsProvider, which uses PAYMENT_SERVICE_BASE_URL + API_KEY.
+// Query names are mapped to what the payment service expects (page, limit, transaction_type, ...).
 export const getWalletTransactionHistoryForOneBusiness = async (
   walletTransactionHistoryInfo: TransactionData,
 ) => {
-  const response = await fetch(
-    `${get_wallet_transaction_history_url}/${walletTransactionHistoryInfo.walletId}/transactions?pageInteger=${walletTransactionHistoryInfo.pageInteger}&limitInteger=${walletTransactionHistoryInfo.limitInteger}&type=${walletTransactionHistoryInfo.type}&status=${walletTransactionHistoryInfo.status}&fromDate=${walletTransactionHistoryInfo.fromDate}&toDate=${walletTransactionHistoryInfo.toDate}`,
-    {
-      method: "GET",
-      headers: {
-        "x-api-key": api_key!,
-      },
-    },
-  );
+  const { walletId, pageInteger, limitInteger, type, status, fromDate, toDate } =
+    walletTransactionHistoryInfo;
 
-  return response.json();
+  return getWalletTransactions(walletId, {
+    page: pageInteger,
+    limit: limitInteger,
+    transaction_type: type as WalletTransactionHistoryQuery["transaction_type"],
+    status: status as WalletTransactionHistoryQuery["status"],
+    from_date: fromDate,
+    to_date: toDate,
+  });
 };
 
 export const getSpecificWalletTransactionHistoryByReferenceNumber = async (
-  referenceNumber: number,
+  referenceNumber: string,
 ) => {
-  const response = await fetch(
-    `${get_specific_wallet_transaction_history_url}/${referenceNumber}`,
-    {
-      method: "GET",
-      headers: {
-        "x-api-key": api_key!,
-      },
-    },
-  );
+  return getTransactionByReference(referenceNumber);
+};
 
-  return response.json();
+export const getPaymentItemWallet = async (
+  businessId: string | number | bigint,
+  paymentItemId: string | number | bigint,
+) => {
+  return walletProvider.getPaymentItemWallet(businessId, paymentItemId);
+};
+
+export const searchWallets = async (searchTerm: string) => {
+  return walletProvider.searchWallets(searchTerm);
 };
