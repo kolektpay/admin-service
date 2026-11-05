@@ -6,6 +6,7 @@ import classAssignmentRouter from "./class/classAssignment.routes";
 import classRouter from "./class/class.routes";
 import subclassRouter from "./class/subclass.routes";
 import adminGuardianRouter from "./guardian.routes/guardian.routes";
+import ledgerRouter from "./ledger/ledger.routes";
 import roleRouter from "./role/role.routes";
 import adminStudentRouter from "./student/student.routes";
 import transactionsRouter from "./transactions/transactions.routes";
@@ -27,6 +28,7 @@ router.use("/admin/class-assignments", classAssignmentRouter);
 
 router.use("/admin/wallet", walletRouter);
 router.use("/admin/transactions", transactionsRouter);
+router.use("/admin/ledger", ledgerRouter);
 
 // Health check
 router.get("/health", (req, res) => {

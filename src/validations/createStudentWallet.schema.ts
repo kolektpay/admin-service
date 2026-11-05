@@ -11,6 +11,9 @@ export const createStudentWalletSchema = z.object({
     address: z.string().min(1),
     city: z.string().min(1),
     alias: z.string().min(1).optional(),
-  
+    // Must be declared here: validate() replaces req.body with the parsed result,
+    // and zod strips unknown keys, so an undeclared studentId would be dropped.
+    studentId: z.coerce.number().int().positive(),
+
   }),
 });

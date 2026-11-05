@@ -1,5 +1,5 @@
 export interface TransactionData {
-  walletId: number;
+  walletId: string;
   pageInteger: number;
   limitInteger: number;
   type: string;
