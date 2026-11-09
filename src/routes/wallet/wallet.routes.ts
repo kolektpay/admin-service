@@ -3,8 +3,6 @@ import { Router } from "express";
 import {
   createBusinessWalletHandler,
   createStudentWalletHandler,
-  generatePaymentLinkHandler,
-  getAllPaymentLinksForOneBusinessHandler,
   getPaymentItemWalletHandler,
   getSpecificStudentWalletAccordingToBusinessIdHandler,
   getWalletDetailsonLoginHandler,
@@ -26,25 +24,12 @@ const router = Router();
 
 router.get("/", authenticateJWT, getWalletDetailsonLoginHandler);
 
-
-router.post(
-  "/payment-links",
-  authenticateJWT,
-  generatePaymentLinkHandler,
-);
-
 router.post(
   "/student-wallets",
   authenticateJWT,
   validate(createStudentWalletSchema),
 
   createStudentWalletHandler,
-);
-
-router.get(
-  "/payment-links",
-  authenticateJWT,
-  getAllPaymentLinksForOneBusinessHandler,
 );
 
 // Wallet service routes - must stay above "/:walletid" or Express treats them as a wallet id
