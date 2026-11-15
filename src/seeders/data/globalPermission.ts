@@ -413,6 +413,19 @@ export const PERMISSIONS = {
         type: "action",
         category: "admin",
       },
+      {
+        name: "admin.audit_logs.view_all",
+        description:
+          "View the audit logs of every administrator, student and guardian in the business",
+        type: "action",
+        category: "admin",
+      },
+      {
+        name: "admin.audit_logs.view_own",
+        description: "View your own audit log activity",
+        type: "action",
+        category: "admin",
+      },
     ],
   },
   students: {

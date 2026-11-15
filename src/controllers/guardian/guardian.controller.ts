@@ -2,7 +2,6 @@ import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
 
-import prisma from "../../config/database";
 import { IGuardianFormData } from "../../interfaces/guardian.interfaces";
 import { passwordHistoryChecker } from "../../managers/passwordHistoryChecker";
 import { AuditModel } from "../../models/audit.model";
@@ -36,61 +35,6 @@ const saltRounds: number = Number(process.env.SALT_ROUNDS) || 13;
  *       bearerFormat: JWT
  *       description: "Enter JWT token only. Swagger UI will automatically send it as Authorization: Bearer <token>"
  */
-
-/**
- * @swagger
- * /api/v1/admin/audit-logs/{userId}:
- *   get:
- *     summary: View audit logs
- *     description: Managers can view all audit logs. If a userId path param is provided, only that user's logs are returned. If omitted, all logs are returned. Manager only.
- *     tags:
- *       - Users
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: false
- *         schema:
- *           type: string
- *         example: user-123
- *     responses:
- *       200:
- *         description: Audit logs retrieved successfully
- *       401:
- *         description: Unauthorized - Invalid or missing access token
- *       403:
- *         description: Forbidden - managers only
- *       500:
- *         description: Internal server error
- *     security:
- *       - bearerAuth: []
- */
-export const viewAuditLogsHandler = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const managerUserId = req.userId!;
-
-    const { userId } = req.params;
-
-    const { ip } = extractRequestMetadata(req);
-
-    let auditLogs;
-
-    if (!userId) {
-      auditLogs = await prisma.auditLogs.findMany();
-    } else {
-      auditLogs = await prisma.auditLogs.findMany({
-        where: { userId: userId as string },
-      });
-    }
-    await AuditModel.logAuditLogsViewed(managerUserId! as string, ip);
-    return successResponse(res, "Audit logs retrieved successfully", auditLogs);
-  } catch (error) {
-    console.log(error);
-    return errorResponse(res, "Failed to fetch audit logs", 500);
-  }
-};
 
 /**
  * @swagger

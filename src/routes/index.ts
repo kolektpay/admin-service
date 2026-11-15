@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { config } from "../config/app";
+import auditLogRouter from "./audit/auditLog.routes";
 import authRouter from "./auth/auth.routes";
 import classAssignmentRouter from "./class/classAssignment.routes";
 import classRouter from "./class/class.routes";
@@ -17,6 +18,7 @@ const router = Router();
 
 // API routes
 router.use("/admin/auth", authRouter);
+router.use("/admin/audit-logs", auditLogRouter);
 router.use("/admin", adminRouter);
 router.use("/admin", roleRouter);
 

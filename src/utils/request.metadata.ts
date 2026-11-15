@@ -4,6 +4,7 @@ import geoip from "geoip-lite";
 import { UAParser } from "ua-parser-js";
 
 import { RequestMetadata } from "../interfaces/requestMetadata.interface";
+import { clientIp } from "./auditContext";
 
 export const extractRequestMetadata = (
   req: Request
@@ -17,9 +18,9 @@ export const extractRequestMetadata = (
   const os = parser.getOS().name;
 
   // 2️⃣ IP address
-  const ip =
-    (req.headers["x-forwarded-for"] as string) ||
-    req.socket.remoteAddress;
+  // From req.ip, which only trusts X-Forwarded-For for the configured proxy
+  // hops (TRUST_PROXY), so clients cannot fake it
+  const ip = clientIp(req);
 
   // 3️⃣ Location
   let location: string | undefined;

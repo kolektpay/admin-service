@@ -227,3 +227,29 @@ export const requirePermission =
       next(error);
     }
   };
+
+/**
+ * Requires a business ID from the verified JWT (set by authenticateJWT) and
+ * normalises it to a bigint. Business-scoped handlers must only ever read
+ * req.businessId, never a business ID sent in the body, query or params.
+ */
+export const requireBusinessContext = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const { businessId } = req;
+
+  // Tokens for users without a business carry businessId 0
+  if (businessId === undefined || businessId === null || Number(businessId) <= 0) {
+    return errorResponse(res, "unauthorised: no business associated with this token", 403);
+  }
+
+  try {
+    req.businessId = BigInt(businessId);
+  } catch {
+    return errorResponse(res, "unauthorised: invalid business in token", 403);
+  }
+
+  next();
+};
