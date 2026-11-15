@@ -13,7 +13,6 @@ import {
   updateAdminStatusHandler,
 } from "../controllers/admin/admin.controller";
 import {
-  viewAuditLogsHandler,
   fetchRolesAndPermissionsHandler,
   enforcePasswordRotationHandler,
   changeAnyUserPasswordHandler,
@@ -91,14 +90,6 @@ router.patch(
 // ==========================================
 // Admin & User Management Routes
 // ==========================================
-
-// Audit logs
-router.get(
-  "/audit-logs/:userId?",
-  authenticateJWT,
-  requireManager,
-  viewAuditLogsHandler,
-);
 
 // Roles and permissions
 router.get(

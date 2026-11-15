@@ -121,6 +121,20 @@ model AuditLogs {
   studentId  BigInt?          @map("student_id")
   guardianId BigInt?          @map("guardian_id")
   businessId BigInt?          @map("business_id")
+  /// Who performed the action. userId / studentId / guardianId identify the
+  /// account(s) involved; actorType says which of them acted.
+  actorType  AuditActorType?  @map("actor_type")
+  /// Fixed action code, e.g. auth.login_succeeded or student.blocked
+  action     String?          @db.VarChar(100)
+  /// What the action was performed on, when it is not the actor themselves
+  targetType String?          @map("target_type") @db.VarChar(50)
+  targetId   String?          @map("target_id") @db.VarChar(64)
+  userAgent  String?          @map("user_agent") @db.VarChar(500)
+  httpMethod String?          @map("http_method") @db.VarChar(10)
+  path       String?          @db.VarChar(255)
+  requestId  String?          @map("request_id") @db.VarChar(100)
+  /// Extra details (reason, changed fields, status code, ...). Never secrets.
+  metadata   Json?
   businesses Businesses?      @relation(fields: [businessId], references: [id], onDelete: Restrict)
   guardians  Guardians?       @relation(fields: [guardianId], references: [id], onDelete: Restrict)
   students   Students?        @relation(fields: [studentId], references: [id], onDelete: Restrict)
@@ -128,6 +142,12 @@ model AuditLogs {
 
   @@index([userId])
   @@index([ipAddress])
+  @@index([businessId, createdAt])
+  @@index([studentId, createdAt])
+  @@index([guardianId, createdAt])
+  @@index([createdAt])
+  @@index([businessId, actorType, createdAt])
+  @@index([action])
   @@map("auditlogs")
 }
 
@@ -473,6 +493,15 @@ enum UserStatus {
   otp_verify
   on_leave
   blocked_by_admin
+}
+
+enum AuditActorType {
+  admin
+  student
+  guardian
+  /// An unauthenticated attempt for an account that does not exist
+  anonymous
+  system
 }
 
 enum AuditLoginResult {

@@ -5,6 +5,7 @@ import swaggerUi from "swagger-ui-express";
 
 import { config } from "./config/app";
 import swaggerSpec from "./config/swagger";
+import { auditTrail } from "./middleware/auditTrail.middleware";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import { requestLogger } from "./middleware/logger.middleware";
 import routes from "./routes";
@@ -16,6 +17,10 @@ import routes from "./routes";
 
 const app: Application = express();
 
+// Believe X-Forwarded-For only for our own proxies, so req.ip (and the IP in
+// audit logs) is the real client address and cannot be faked by the client
+app.set("trust proxy", config.trustProxy);
+
 // Middleware
 app.use(helmet());
 // get list of cors urls from .env file
@@ -24,6 +29,7 @@ app.use(cors({ origin: corsUrls }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
+app.use(auditTrail);
 
 
 // Routes
