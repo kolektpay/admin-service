@@ -1,4 +1,4 @@
-import { AuditLoginResult } from "@prisma/client";
+import { AuditActorType, AuditLoginResult } from "@prisma/client";
 import { z } from "zod";
 
 export const MAX_AUDIT_LOGS_PER_PAGE = 100;
@@ -49,40 +49,47 @@ export const listAuditLogsQuerySchema = z
   .strictObject({
     ...baseAuditLogQuery,
     // Whose activity to show; omit to show everyone in the business
-    actorType: z.enum(["admin", "student", "guardian"]).optional(),
+    actorType: z.enum(AuditActorType).optional(),
   })
   .refine(fromBeforeTo, fromBeforeToMessage);
 
-// One administrator's logs (/me and /:userId): only what they did
+// Your own logs (/me): only what you did
 export const listOwnAuditLogsQuerySchema = z
   .strictObject(baseAuditLogQuery)
   .refine(fromBeforeTo, fromBeforeToMessage);
 
-// One student's or guardian's logs. By default only what they did themselves;
-// include=received also returns what administrators did to the account.
-export const listAccountAuditLogsQuerySchema = z
+// Administrators' logs: one administrator with userId, otherwise all of them
+export const listAdminsAuditLogsQuerySchema = z
   .strictObject({
     ...baseAuditLogQuery,
-    include: z.enum(["received"]).optional(),
+    userId: z.uuid({ message: "userId must be a valid UUID" }).optional(),
   })
   .refine(fromBeforeTo, fromBeforeToMessage);
 
-// ==========================================
-// Path parameters: the account whose logs are requested
-// ==========================================
+// By default only what the account(s) did themselves; include=received also
+// returns what administrators (and, for students, guardians) did to them
+const includeReceived = z.enum(["received"]).optional();
 
-export const auditLogUserParamsSchema = z.object({
-  userId: z.uuid({ message: "userId must be a valid UUID" }),
-});
+// Students' logs: one student with studentId, otherwise all of them
+export const listStudentsAuditLogsQuerySchema = z
+  .strictObject({
+    ...baseAuditLogQuery,
+    studentId: bigintIdSchema.optional(),
+    include: includeReceived,
+  })
+  .refine(fromBeforeTo, fromBeforeToMessage);
 
-export const auditLogStudentParamsSchema = z.object({
-  studentId: bigintIdSchema,
-});
-
-export const auditLogGuardianParamsSchema = z.object({
-  guardianId: bigintIdSchema,
-});
+// Guardians' logs: one guardian with guardianId, otherwise all of them
+export const listGuardiansAuditLogsQuerySchema = z
+  .strictObject({
+    ...baseAuditLogQuery,
+    guardianId: bigintIdSchema.optional(),
+    include: includeReceived,
+  })
+  .refine(fromBeforeTo, fromBeforeToMessage);
 
 export type ListAuditLogsQuery = z.infer<typeof listAuditLogsQuerySchema>;
 export type ListOwnAuditLogsQuery = z.infer<typeof listOwnAuditLogsQuerySchema>;
-export type ListAccountAuditLogsQuery = z.infer<typeof listAccountAuditLogsQuerySchema>;
+export type ListAdminsAuditLogsQuery = z.infer<typeof listAdminsAuditLogsQuerySchema>;
+export type ListStudentsAuditLogsQuery = z.infer<typeof listStudentsAuditLogsQuerySchema>;
+export type ListGuardiansAuditLogsQuery = z.infer<typeof listGuardiansAuditLogsQuerySchema>;
