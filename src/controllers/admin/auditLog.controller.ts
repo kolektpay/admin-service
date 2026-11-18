@@ -2,17 +2,20 @@ import { Request, Response } from "express";
 
 import { AdminActor } from "../../interfaces/admin.interfaces";
 import {
-  listAccountAuditLogs,
-  listAdminAuditLogs,
+  listAdminsAuditLogs,
   listBusinessAuditLogs,
+  listGuardiansAuditLogs,
   listOwnAuditLogs,
+  listStudentsAuditLogs,
 } from "../../services/auditLog.service";
 import { extractRequestMetadata } from "../../utils/request.metadata";
 import { successResponse } from "../../utils/response.util";
 import {
-  ListAccountAuditLogsQuery,
+  ListAdminsAuditLogsQuery,
   ListAuditLogsQuery,
+  ListGuardiansAuditLogsQuery,
   ListOwnAuditLogsQuery,
+  ListStudentsAuditLogsQuery,
 } from "../../validations/auditLog.schema";
 
 // requireBusinessContext has already taken the business ID from the token
@@ -78,7 +81,7 @@ const getActor = (req: Request): AdminActor => ({
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
- *       - { in: query, name: actorType, schema: { type: string, enum: [admin, student, guardian] } }
+ *       - { in: query, name: actorType, schema: { type: string, enum: [admin, student, guardian, anonymous, system] }, description: Only rows where this kind of account acted }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: student.blocked }
  *       - { in: query, name: from, schema: { type: string, format: date-time } }
@@ -121,115 +124,155 @@ export const listAuditLogsHandler = async (
 
 /**
  * @swagger
- * /api/v1/admin/audit-logs/{userId}:
+ * /api/v1/admin/audit-logs/admins:
  *   get:
- *     summary: View one administrator's audit logs
+ *     summary: View administrators' audit logs
  *     description: |
- *       Returns what one administrator in your business did. Returns an empty list
- *       if the administrator is not in your business. Requires admin.audit_logs.view_all.
+ *       Returns what administrators in your business did, newest first. Pass userId
+ *       for one administrator; leave it out for every administrator. Returns an
+ *       empty list if the administrator is not in your business.
+ *       Requires admin.audit_logs.view_all.
  *     tags:
  *       - Audit Logs
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - { in: path, name: userId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: userId, schema: { type: string, format: uuid }, description: One administrator. Omit for all administrators }
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
- *       - { in: query, name: from, schema: { type: string, format: date-time } }
- *       - { in: query, name: to, schema: { type: string, format: date-time } }
+ *       - { in: query, name: from, schema: { type: string, format: date-time }, description: "On or after this time. A date such as 2026-11-01 starts at midnight UTC" }
+ *       - { in: query, name: to, schema: { type: string, format: date-time }, description: "On or before this time. A date such as 2026-11-14 includes that whole day (UTC)" }
  *     responses:
- *       200: { description: Audit logs fetched }
- *       400: { description: Invalid path or query parameters }
+ *       200:
+ *         description: Audit logs fetched
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Audit logs fetched successfully }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     logs: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400: { description: Invalid query parameters }
  *       401: { description: Unauthorized - Invalid or missing access token }
  *       403: { description: No business in the token, or missing admin.audit_logs.view_all }
  *
- * /api/v1/admin/audit-logs/students/{studentId}:
+ * /api/v1/admin/audit-logs/students:
  *   get:
- *     summary: View one student's audit logs
+ *     summary: View students' audit logs
  *     description: |
- *       Returns what one student in your business did, such as logins and password
- *       changes. Add include=received to also see what administrators did to the
- *       student (created, updated, blocked, ...). Requires admin.audit_logs.view_all.
+ *       Returns what students in your business did, such as logins and password
+ *       changes, newest first. Pass studentId for one student; leave it out for every
+ *       student. Add include=received to also see what administrators and guardians
+ *       did to the student(s) (created, updated, blocked, ...).
+ *       Requires admin.audit_logs.view_all.
  *     tags:
  *       - Audit Logs
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - { in: path, name: studentId, required: true, schema: { type: integer } }
- *       - { in: query, name: include, schema: { type: string, enum: [received] }, description: Also return what administrators did to this account }
+ *       - { in: query, name: studentId, schema: { type: integer }, description: One student. Omit for all students }
+ *       - { in: query, name: include, schema: { type: string, enum: [received] }, description: Also return what others did to the student(s) }
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
- *       - { in: query, name: from, schema: { type: string, format: date-time } }
- *       - { in: query, name: to, schema: { type: string, format: date-time } }
+ *       - { in: query, name: from, schema: { type: string, format: date-time }, description: "On or after this time. A date such as 2026-11-01 starts at midnight UTC" }
+ *       - { in: query, name: to, schema: { type: string, format: date-time }, description: "On or before this time. A date such as 2026-11-14 includes that whole day (UTC)" }
  *     responses:
- *       200: { description: Audit logs fetched }
- *       400: { description: Invalid path or query parameters }
+ *       200:
+ *         description: Audit logs fetched
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Audit logs fetched successfully }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     logs: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400: { description: Invalid query parameters }
  *       401: { description: Unauthorized - Invalid or missing access token }
  *       403: { description: No business in the token, or missing admin.audit_logs.view_all }
  *
- * /api/v1/admin/audit-logs/guardians/{guardianId}:
+ * /api/v1/admin/audit-logs/guardians:
  *   get:
- *     summary: View one guardian's audit logs
+ *     summary: View guardians' audit logs
  *     description: |
- *       Returns what one guardian in your business did. Add include=received to also
- *       see what administrators did to the guardian. Requires admin.audit_logs.view_all.
+ *       Returns what guardians in your business did, newest first. Pass guardianId
+ *       for one guardian; leave it out for every guardian. Add include=received to
+ *       also see what administrators did to the guardian(s).
+ *       Requires admin.audit_logs.view_all.
  *     tags:
  *       - Audit Logs
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - { in: path, name: guardianId, required: true, schema: { type: integer } }
- *       - { in: query, name: include, schema: { type: string, enum: [received] }, description: Also return what administrators did to this account }
+ *       - { in: query, name: guardianId, schema: { type: integer }, description: One guardian. Omit for all guardians }
+ *       - { in: query, name: include, schema: { type: string, enum: [received] }, description: Also return what administrators did to the guardian(s) }
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
- *       - { in: query, name: from, schema: { type: string, format: date-time } }
- *       - { in: query, name: to, schema: { type: string, format: date-time } }
+ *       - { in: query, name: from, schema: { type: string, format: date-time }, description: "On or after this time. A date such as 2026-11-01 starts at midnight UTC" }
+ *       - { in: query, name: to, schema: { type: string, format: date-time }, description: "On or before this time. A date such as 2026-11-14 includes that whole day (UTC)" }
  *     responses:
- *       200: { description: Audit logs fetched }
- *       400: { description: Invalid path or query parameters }
+ *       200:
+ *         description: Audit logs fetched
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Audit logs fetched successfully }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     logs: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       400: { description: Invalid query parameters }
  *       401: { description: Unauthorized - Invalid or missing access token }
  *       403: { description: No business in the token, or missing admin.audit_logs.view_all }
  */
-export const listAdminAuditLogsHandler = async (
+export const listAdminsAuditLogsHandler = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const result = await listAdminAuditLogs(
+  const result = await listAdminsAuditLogs(
     getActor(req),
-    req.params.userId as string,
-    req.query as unknown as ListOwnAuditLogsQuery,
+    req.query as unknown as ListAdminsAuditLogsQuery,
   );
   successResponse(res, "Audit logs fetched successfully", result);
 };
 
-export const listStudentAuditLogsHandler = async (
+export const listStudentsAuditLogsHandler = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { studentId } = req.params as unknown as { studentId: bigint };
-  const result = await listAccountAuditLogs(
+  const result = await listStudentsAuditLogs(
     getActor(req),
-    { studentId },
-    req.query as unknown as ListAccountAuditLogsQuery,
+    req.query as unknown as ListStudentsAuditLogsQuery,
   );
   successResponse(res, "Audit logs fetched successfully", result);
 };
 
-export const listGuardianAuditLogsHandler = async (
+export const listGuardiansAuditLogsHandler = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const { guardianId } = req.params as unknown as { guardianId: bigint };
-  const result = await listAccountAuditLogs(
+  const result = await listGuardiansAuditLogs(
     getActor(req),
-    { guardianId },
-    req.query as unknown as ListAccountAuditLogsQuery,
+    req.query as unknown as ListGuardiansAuditLogsQuery,
   );
   successResponse(res, "Audit logs fetched successfully", result);
 };

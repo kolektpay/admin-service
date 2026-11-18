@@ -296,6 +296,8 @@ model Students {
   UserPasswordReset                UserPasswordReset[]
   tokens                           UserTokens[]
 
+  @@index([businessId, deletedAt, createdAt])
+  @@index([subclassId])
   @@map("students")
 }
 

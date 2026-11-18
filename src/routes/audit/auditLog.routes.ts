@@ -1,11 +1,11 @@
 import { Router } from "express";
 
 import {
-  listAdminAuditLogsHandler,
+  listAdminsAuditLogsHandler,
   listAuditLogsHandler,
-  listGuardianAuditLogsHandler,
+  listGuardiansAuditLogsHandler,
   listOwnAuditLogsHandler,
-  listStudentAuditLogsHandler,
+  listStudentsAuditLogsHandler,
 } from "../../controllers/admin/auditLog.controller";
 import {
   authenticateJWT,
@@ -15,12 +15,11 @@ import {
 import { validateRequest } from "../../middleware/validation.middleware";
 import { asyncHandler } from "../../utils/asyncHandler";
 import {
-  auditLogGuardianParamsSchema,
-  auditLogStudentParamsSchema,
-  auditLogUserParamsSchema,
-  listAccountAuditLogsQuerySchema,
+  listAdminsAuditLogsQuerySchema,
   listAuditLogsQuerySchema,
+  listGuardiansAuditLogsQuerySchema,
   listOwnAuditLogsQuerySchema,
+  listStudentsAuditLogsQuerySchema,
 } from "../../validations/auditLog.schema";
 
 const router = Router();
@@ -33,7 +32,6 @@ const canViewOwnAuditLogs = requirePermission("admin.audit_logs.view_own");
 // The business is always taken from the token, never from the request.
 // ==========================================
 
-// Registered before "/:userId" so "me" is never read as an administrator ID
 router.get(
   "/me",
   authenticateJWT,
@@ -52,35 +50,34 @@ router.get(
   asyncHandler(listAuditLogsHandler),
 );
 
+// One administrator with ?userId=, otherwise every administrator
 router.get(
-  "/students/:studentId",
+  "/admins",
   authenticateJWT,
   requireBusinessContext,
   canViewAllAuditLogs,
-  validateRequest("params", auditLogStudentParamsSchema),
-  validateRequest("query", listAccountAuditLogsQuerySchema),
-  asyncHandler(listStudentAuditLogsHandler),
+  validateRequest("query", listAdminsAuditLogsQuerySchema),
+  asyncHandler(listAdminsAuditLogsHandler),
 );
 
+// One student with ?studentId=, otherwise every student
 router.get(
-  "/guardians/:guardianId",
+  "/students",
   authenticateJWT,
   requireBusinessContext,
   canViewAllAuditLogs,
-  validateRequest("params", auditLogGuardianParamsSchema),
-  validateRequest("query", listAccountAuditLogsQuerySchema),
-  asyncHandler(listGuardianAuditLogsHandler),
+  validateRequest("query", listStudentsAuditLogsQuerySchema),
+  asyncHandler(listStudentsAuditLogsHandler),
 );
 
-// An administrator's logs; must stay after "/me"
+// One guardian with ?guardianId=, otherwise every guardian
 router.get(
-  "/:userId",
+  "/guardians",
   authenticateJWT,
   requireBusinessContext,
   canViewAllAuditLogs,
-  validateRequest("params", auditLogUserParamsSchema),
-  validateRequest("query", listOwnAuditLogsQuerySchema),
-  asyncHandler(listAdminAuditLogsHandler),
+  validateRequest("query", listGuardiansAuditLogsQuerySchema),
+  asyncHandler(listGuardiansAuditLogsHandler),
 );
 
 export default router;

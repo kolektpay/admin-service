@@ -4,9 +4,11 @@ import prisma from "../config/database";
 import { AdminActor } from "../interfaces/admin.interfaces";
 import { AuditModel } from "../models/audit.model";
 import {
-  ListAccountAuditLogsQuery,
+  ListAdminsAuditLogsQuery,
   ListAuditLogsQuery,
+  ListGuardiansAuditLogsQuery,
   ListOwnAuditLogsQuery,
+  ListStudentsAuditLogsQuery,
 } from "../validations/auditLog.schema";
 
 const auditLogSelect = {
@@ -34,9 +36,6 @@ const auditLogSelect = {
   },
   guardians: { select: { id: true, firstName: true, lastName: true } },
 } satisfies Prisma.AuditLogsSelect;
-
-/** A student or guardian account whose logs are requested. */
-export type AccountSubject = { studentId: bigint } | { guardianId: bigint };
 
 /**
  * A guardian belongs to a business directly, or (when businessId was never
@@ -132,16 +131,18 @@ export const listBusinessAuditLogs = async (
   return result;
 };
 
-/** What one administrator in the actor's business did. */
-export const listAdminAuditLogs = async (
+/**
+ * What administrators in the actor's business did: one administrator when
+ * userId is given, otherwise all of them.
+ */
+export const listAdminsAuditLogs = async (
   actor: AdminActor,
-  adminId: string,
-  query: ListOwnAuditLogsQuery,
+  query: ListAdminsAuditLogsQuery,
 ) => {
   const where: Prisma.AuditLogsWhereInput = {
     AND: [
       belongsToBusiness(actor.businessId),
-      { userId: adminId, actorType: "admin" },
+      { actorType: "admin", ...(query.userId && { userId: query.userId }) },
       ...commonFilters(query),
     ],
   };
@@ -152,23 +153,62 @@ export const listAdminAuditLogs = async (
 };
 
 /**
- * What one student or guardian in the actor's business did. With
- * include=received, also what administrators did to that account.
+ * Rows for students or guardians. By default only what they did themselves.
+ * With include=received, also every row naming them, such as an administrator
+ * blocking a student or a guardian editing their child's permissions.
  */
-export const listAccountAuditLogs = async (
+const accountFilter = (
+  kind: "student" | "guardian",
+  id: bigint | undefined,
+  include: "received" | undefined,
+): Prisma.AuditLogsWhereInput => {
+  const idColumn = kind === "student" ? "studentId" : "guardianId";
+  const actedThemselves: Prisma.AuditLogsWhereInput = { actorType: kind };
+
+  if (id !== undefined) {
+    return include === "received"
+      ? { [idColumn]: id }
+      : { [idColumn]: id, ...actedThemselves };
+  }
+
+  return include === "received"
+    ? { OR: [actedThemselves, { [idColumn]: { not: null } }] }
+    : actedThemselves;
+};
+
+/**
+ * What students in the actor's business did: one student when studentId is
+ * given, otherwise all of them.
+ */
+export const listStudentsAuditLogs = async (
   actor: AdminActor,
-  subject: AccountSubject,
-  query: ListAccountAuditLogsQuery,
+  query: ListStudentsAuditLogsQuery,
 ) => {
   const where: Prisma.AuditLogsWhereInput = {
     AND: [
       belongsToBusiness(actor.businessId),
-      subject,
-      // By default only what the account did itself; "received" adds what
-      // administrators (and, for a student, their guardian) did to it
-      ...(query.include === "received"
-        ? []
-        : [{ actorType: "studentId" in subject ? ("student" as const) : ("guardian" as const) }]),
+      accountFilter("student", query.studentId, query.include),
+      ...commonFilters(query),
+    ],
+  };
+
+  const result = await fetchPage(where, query.page, query.limit);
+  await AuditModel.logAuditLogsViewed(actor.userId, actor.ip, actor.businessId);
+  return result;
+};
+
+/**
+ * What guardians in the actor's business did: one guardian when guardianId is
+ * given, otherwise all of them.
+ */
+export const listGuardiansAuditLogs = async (
+  actor: AdminActor,
+  query: ListGuardiansAuditLogsQuery,
+) => {
+  const where: Prisma.AuditLogsWhereInput = {
+    AND: [
+      belongsToBusiness(actor.businessId),
+      accountFilter("guardian", query.guardianId, query.include),
       ...commonFilters(query),
     ],
   };
