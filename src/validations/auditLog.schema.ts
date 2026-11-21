@@ -20,6 +20,8 @@ const baseAuditLogQuery = {
     .max(MAX_AUDIT_LOGS_PER_PAGE)
     .default(20),
   result: z.enum(AuditLoginResult).optional(),
+  // The search box: matches the actor's or the target's name
+  search: z.string().trim().max(100).optional().transform((value) => value || undefined),
   // An exact action code (student.blocked) or a whole area (auth.*)
   action: z
     .string()
@@ -66,16 +68,16 @@ export const listAdminsAuditLogsQuerySchema = z
   })
   .refine(fromBeforeTo, fromBeforeToMessage);
 
-// By default only what the account(s) did themselves; include=received also
-// returns what administrators (and, for students, guardians) did to them
-const includeReceived = z.enum(["received"]).optional();
+// By default (all) what the account(s) did plus what administrators (and, for
+// students, guardians) did to them; own is only what they did themselves
+const accountScope = z.enum(["all", "own"]).default("all");
 
 // Students' logs: one student with studentId, otherwise all of them
 export const listStudentsAuditLogsQuerySchema = z
   .strictObject({
     ...baseAuditLogQuery,
     studentId: bigintIdSchema.optional(),
-    include: includeReceived,
+    scope: accountScope,
   })
   .refine(fromBeforeTo, fromBeforeToMessage);
 
@@ -84,7 +86,7 @@ export const listGuardiansAuditLogsQuerySchema = z
   .strictObject({
     ...baseAuditLogQuery,
     guardianId: bigintIdSchema.optional(),
-    include: includeReceived,
+    scope: accountScope,
   })
   .refine(fromBeforeTo, fromBeforeToMessage);
 

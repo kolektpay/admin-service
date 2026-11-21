@@ -772,6 +772,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...adminTarget(adminId),
         result: "success",
         action: "admin.created" as const,
         status: `admin_created: ${adminId} with roles [${roleIds.join(", ")}]`,
@@ -788,6 +789,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...adminTarget(adminId),
         result: "success",
         action: "admin.updated" as const,
         status: `admin_updated: ${adminId} (${updatedFields.join(", ")})`,
@@ -805,6 +807,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...adminTarget(adminId),
         result: "success",
         action: "admin.roles_changed" as const,
         status: `admin_roles_changed: ${adminId}, added [${added.join(", ")}], removed [${removed.join(", ")}]`,
@@ -820,6 +823,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...adminTarget(adminId),
         result: "success",
         action: "admin.deleted" as const,
         status: `admin_deleted: ${adminId}`,
@@ -837,8 +841,10 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...adminTarget(adminId),
         result: status === "blocked" || status === "blocked_by_admin" ? "blocked" : "success",
         action: "admin.status_changed" as const,
+        metadata: { newStatus: status, ...(reason && { reason }) },
         status: `admin_status_changed: ${adminId} to ${status}${reason ? ` due to ${reason}` : ""}`,
       },
     });
@@ -853,6 +859,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...roleTarget(roleId, roleName),
         result: "success",
         action: "role.created" as const,
         status: `role_created: ${roleId} (${roleName})`,
@@ -869,6 +876,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...roleTarget(roleId, roleName),
         result: "success",
         action: "role.deleted" as const,
         status: `role_deleted: ${roleId} (${roleName})`,
@@ -876,15 +884,20 @@ export class AuditModel {
     });
   }
 
-  /** Class and subclass changes, e.g. "class_created: 4 (JSS 1)". */
+  /**
+   * Class and subclass changes, e.g. "class_created: 4 (JSS 1)". target names
+   * what was changed: a subclass, or a student (studentId) moved between them.
+   */
   static async logClassChange(
     actor: AdminActor,
     status: string,
     db: DbClient = prisma,
+    target?: ClassChangeTarget,
   ): Promise<void> {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...classChangeTarget(target),
         result: "success",
         action: classChangeAction(status),
         status,
@@ -903,6 +916,7 @@ export class AuditModel {
     await createAuditLog(db, {
       data: {
         ...auditActor(actor),
+        ...roleTarget(roleId, roleName),
         result: "success",
         action: "role.permissions_updated" as const,
         status: `role_permissions_updated: role ${roleId} (${roleName}), added [${added.join(", ")}], removed [${removed.join(", ")}]`,
@@ -916,3 +930,34 @@ const auditActor = (actor: AdminActor) => ({
   businessId: actor.businessId,
   ipAddress: actor.ip,
 });
+
+/** The administrator an admin.* action was performed on. */
+const adminTarget = (adminId: string) => ({
+  targetType: "admin",
+  targetId: adminId,
+});
+
+/**
+ * The role a role.* action was performed on. The name is kept in metadata so
+ * the log still reads correctly after the role is renamed or deleted.
+ */
+const roleTarget = (roleId: bigint, roleName: string) => ({
+  targetType: "role",
+  targetId: String(roleId),
+  metadata: { targetName: roleName },
+});
+
+export type ClassChangeTarget =
+  | { studentId: bigint }
+  | { subclassId: bigint; subclassName?: string };
+
+const classChangeTarget = (target: ClassChangeTarget | undefined) => {
+  if (!target) return {};
+  // createAuditLog turns studentId into a "student" target
+  if ("studentId" in target) return { studentId: target.studentId };
+  return {
+    targetType: "subclass",
+    targetId: String(target.subclassId),
+    ...(target.subclassName && { metadata: { targetName: target.subclassName } }),
+  };
+};

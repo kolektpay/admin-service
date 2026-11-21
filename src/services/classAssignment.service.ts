@@ -177,6 +177,7 @@ export const assignStudentToSubclass = async (
         actor,
         `student_subclass_assigned: student ${studentId} from ${from} to ${input.subclassId}`,
         tx,
+        { studentId },
       );
 
       const updated = await tx.students.findUniqueOrThrow({
@@ -228,6 +229,7 @@ export const unassignStudent = async (
       actor,
       `student_subclass_unassigned: student ${studentId} from subclass ${student.subclassId}`,
       tx,
+      { studentId },
     );
 
     const updated = await tx.students.findUniqueOrThrow({
@@ -299,6 +301,7 @@ export const bulkAssignStudents = async (input: BulkAssignStudentsInput, actor: 
               actor,
               `students_assigned: ${rows.length} to subclass ${subclassId}`,
               tx,
+              { subclassId },
             );
             return rows;
           })
@@ -398,6 +401,7 @@ export const bulkTransferStudents = async (
               actor,
               `students_transferred: ${rows.length} from subclass ${sourceSubclassId} to ${destinationSubclassId}`,
               tx,
+              { subclassId: destinationSubclassId },
             );
             return rows;
           })
