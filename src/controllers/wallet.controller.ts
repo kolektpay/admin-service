@@ -234,6 +234,18 @@ export const createStudentWalletHandler = async (
       studentWalletCreationInfo,
     );
 
+    // The wallet service client never throws: a failed call comes back as
+    // { success: false, error }. Stop here so the student is not marked as
+    // having a wallet and the caller is not told it worked.
+    if (!createdWalletForStudent || createdWalletForStudent.success === false) {
+      return errorResponse(
+        res,
+        "Could not create student wallet",
+        502,
+        createdWalletForStudent?.error ?? createdWalletForStudent?.message,
+      );
+    }
+
     await AuditModel.logNewStudentWalletCreation(userId as string, ip);
     await isStudentWalletCreated.changeStudentWalletCreationBooleanToTrue(
       BigInt(studentWalletCreationInfo.student.studentId),
