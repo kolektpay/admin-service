@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../config/database";
 import { AdminActor } from "../interfaces/admin.interfaces";
 import { AuditModel } from "../models/audit.model";
+import { auditLogSelect, presentAuditLogs } from "./auditLogPresenter";
 import {
   ListAdminsAuditLogsQuery,
   ListAuditLogsQuery,
@@ -10,32 +11,6 @@ import {
   ListOwnAuditLogsQuery,
   ListStudentsAuditLogsQuery,
 } from "../validations/auditLog.schema";
-
-const auditLogSelect = {
-  id: true,
-  createdAt: true,
-  result: true,
-  status: true,
-  ipAddress: true,
-  businessId: true,
-  actorType: true,
-  action: true,
-  targetType: true,
-  targetId: true,
-  userId: true,
-  studentId: true,
-  guardianId: true,
-  userAgent: true,
-  httpMethod: true,
-  path: true,
-  requestId: true,
-  metadata: true,
-  user: { select: { id: true, firstName: true, lastName: true, email: true } },
-  students: {
-    select: { id: true, firstName: true, lastName: true, registrationNumber: true },
-  },
-  guardians: { select: { id: true, firstName: true, lastName: true } },
-} satisfies Prisma.AuditLogsSelect;
 
 /**
  * A guardian belongs to a business directly, or (when businessId was never
@@ -64,9 +39,74 @@ const belongsToBusiness = (businessId: bigint): Prisma.AuditLogsWhereInput => ({
   ],
 });
 
-const commonFilters = (
+const contains = (value: string) => ({ contains: value, mode: "insensitive" as const });
+
+/** Every word must appear in one of the fields, so "john john" finds John Johnson. */
+const personMatches = <F extends string>(words: string[], fields: F[]) => ({
+  AND: words.map((word) => ({ OR: fields.map((field) => ({ [field]: contains(word) })) })),
+});
+
+const MAX_SEARCH_TARGET_IDS = 500;
+
+/**
+ * The search box matches the actor's or the target's name. Students and
+ * guardians are on the row itself; administrators, roles and subclasses acted
+ * on are looked up first and matched by id. The row's description is also
+ * searched, which covers roles and subclasses since deleted.
+ */
+const searchFilter = async (
+  search: string | undefined,
+  businessId: bigint,
+): Promise<Prisma.AuditLogsWhereInput[]> => {
+  const words = search?.split(/\s+/).filter(Boolean) ?? [];
+  if (words.length === 0) return [];
+
+  const [admins, roles, subclasses] = await Promise.all([
+    prisma.users.findMany({
+      where: {
+        businesses: { some: { businessId } },
+        ...personMatches(words, ["firstName", "lastName", "email"]),
+      },
+      select: { id: true },
+      take: MAX_SEARCH_TARGET_IDS,
+    }),
+    prisma.role.findMany({
+      where: { OR: [{ businessId }, { businessId: null }], name: contains(search!.trim()) },
+      select: { id: true },
+      take: MAX_SEARCH_TARGET_IDS,
+    }),
+    prisma.subclasses.findMany({
+      where: { businessId, ...personMatches(words, ["name"]) },
+      select: { id: true },
+      take: MAX_SEARCH_TARGET_IDS,
+    }),
+  ]);
+
+  const adminIds = admins.map(({ id }) => id);
+  const targets = (type: string, ids: string[]) =>
+    ids.length ? [{ targetType: type, targetId: { in: ids } }] : [];
+
+  return [
+    {
+      OR: [
+        { user: personMatches(words, ["firstName", "lastName", "email"]) },
+        { students: personMatches(words, ["firstName", "lastName", "registrationNumber"]) },
+        { guardians: personMatches(words, ["firstName", "lastName"]) },
+        ...targets("admin", adminIds),
+        ...targets("role", roles.map(({ id }) => String(id))),
+        ...targets("subclass", subclasses.map(({ id }) => String(id))),
+        { status: contains(search!.trim()) },
+        { ipAddress: { startsWith: search!.trim() } },
+      ],
+    },
+  ];
+};
+
+const commonFilters = async (
   query: ListOwnAuditLogsQuery,
-): Prisma.AuditLogsWhereInput[] => [
+  businessId: bigint,
+): Promise<Prisma.AuditLogsWhereInput[]> => [
+  ...(await searchFilter(query.search, businessId)),
   ...(query.result ? [{ result: query.result }] : []),
   // Exact code (student.blocked), or a whole area (auth.*)
   ...(query.action
@@ -91,6 +131,7 @@ const fetchPage = async (
   where: Prisma.AuditLogsWhereInput,
   page: number,
   limit: number,
+  businessId: bigint,
 ) => {
   const [logs, total] = await Promise.all([
     prisma.auditLogs.findMany({
@@ -104,7 +145,7 @@ const fetchPage = async (
   ]);
 
   return {
-    logs,
+    logs: await presentAuditLogs(logs, businessId),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -122,18 +163,20 @@ export const listBusinessAuditLogs = async (
     AND: [
       belongsToBusiness(actor.businessId),
       ...actorTypeFilter(query.actorType),
-      ...commonFilters(query),
+      ...(await commonFilters(query, actor.businessId)),
     ],
   };
 
-  const result = await fetchPage(where, query.page, query.limit);
+  const result = await fetchPage(where, query.page, query.limit, actor.businessId);
   await AuditModel.logAuditLogsViewed(actor.userId, actor.ip, actor.businessId);
   return result;
 };
 
 /**
  * What administrators in the actor's business did: one administrator when
- * userId is given, otherwise all of them.
+ * userId is given, otherwise all of them. Actions on a student or guardian are
+ * left out, since the Student and Guardian tabs show them; GET /audit-logs
+ * with actorType=admin returns everything administrators did.
  */
 export const listAdminsAuditLogs = async (
   actor: AdminActor,
@@ -142,36 +185,41 @@ export const listAdminsAuditLogs = async (
   const where: Prisma.AuditLogsWhereInput = {
     AND: [
       belongsToBusiness(actor.businessId),
-      { actorType: "admin", ...(query.userId && { userId: query.userId }) },
-      ...commonFilters(query),
+      {
+        actorType: "admin",
+        studentId: null,
+        guardianId: null,
+        ...(query.userId && { userId: query.userId }),
+      },
+      ...(await commonFilters(query, actor.businessId)),
     ],
   };
 
-  const result = await fetchPage(where, query.page, query.limit);
+  const result = await fetchPage(where, query.page, query.limit, actor.businessId);
   await AuditModel.logAuditLogsViewed(actor.userId, actor.ip, actor.businessId);
   return result;
 };
 
 /**
- * Rows for students or guardians. By default only what they did themselves.
- * With include=received, also every row naming them, such as an administrator
- * blocking a student or a guardian editing their child's permissions.
+ * Rows for students or guardians. By default (scope=all) what they did and
+ * every row naming them, such as an administrator blocking a student or a
+ * guardian editing their child's permissions. scope=own is only what they did.
  */
 const accountFilter = (
   kind: "student" | "guardian",
   id: bigint | undefined,
-  include: "received" | undefined,
+  scope: "all" | "own",
 ): Prisma.AuditLogsWhereInput => {
   const idColumn = kind === "student" ? "studentId" : "guardianId";
   const actedThemselves: Prisma.AuditLogsWhereInput = { actorType: kind };
 
   if (id !== undefined) {
-    return include === "received"
+    return scope === "all"
       ? { [idColumn]: id }
       : { [idColumn]: id, ...actedThemselves };
   }
 
-  return include === "received"
+  return scope === "all"
     ? { OR: [actedThemselves, { [idColumn]: { not: null } }] }
     : actedThemselves;
 };
@@ -187,12 +235,12 @@ export const listStudentsAuditLogs = async (
   const where: Prisma.AuditLogsWhereInput = {
     AND: [
       belongsToBusiness(actor.businessId),
-      accountFilter("student", query.studentId, query.include),
-      ...commonFilters(query),
+      accountFilter("student", query.studentId, query.scope),
+      ...(await commonFilters(query, actor.businessId)),
     ],
   };
 
-  const result = await fetchPage(where, query.page, query.limit);
+  const result = await fetchPage(where, query.page, query.limit, actor.businessId);
   await AuditModel.logAuditLogsViewed(actor.userId, actor.ip, actor.businessId);
   return result;
 };
@@ -208,12 +256,12 @@ export const listGuardiansAuditLogs = async (
   const where: Prisma.AuditLogsWhereInput = {
     AND: [
       belongsToBusiness(actor.businessId),
-      accountFilter("guardian", query.guardianId, query.include),
-      ...commonFilters(query),
+      accountFilter("guardian", query.guardianId, query.scope),
+      ...(await commonFilters(query, actor.businessId)),
     ],
   };
 
-  const result = await fetchPage(where, query.page, query.limit);
+  const result = await fetchPage(where, query.page, query.limit, actor.businessId);
   await AuditModel.logAuditLogsViewed(actor.userId, actor.ip, actor.businessId);
   return result;
 };
@@ -227,9 +275,9 @@ export const listOwnAuditLogs = async (
     AND: [
       belongsToBusiness(actor.businessId),
       { userId: actor.userId, actorType: "admin" },
-      ...commonFilters(query),
+      ...(await commonFilters(query, actor.businessId)),
     ],
   };
 
-  return fetchPage(where, query.page, query.limit);
+  return fetchPage(where, query.page, query.limit, actor.businessId);
 };

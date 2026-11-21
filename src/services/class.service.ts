@@ -276,6 +276,7 @@ export const createSubclass = async (
         actor,
         `subclass_created: ${created.id} (${created.name}) in class ${parent.id} (${parent.name})`,
         tx,
+        { subclassId: created.id, subclassName: created.name },
       );
       return toSubclassRecord(created);
     });
@@ -358,6 +359,7 @@ export const updateSubclass = async (
         actor,
         `subclass_updated: ${subclassId} (${updated.name})${changes.length ? `, ${changes.join(", ")}` : ""}`,
         tx,
+        { subclassId, subclassName: updated.name },
       );
       return toSubclassRecord(updated);
     });
@@ -403,6 +405,7 @@ export const deleteSubclass = async (subclassId: bigint, actor: AdminActor): Pro
         actor,
         `subclass_deleted: ${subclassId} (${existing.name}) from class ${existing.classId}`,
         tx,
+        { subclassId, subclassName: existing.name },
       );
     });
   } catch (error) {

@@ -31,37 +31,45 @@ const getActor = (req: Request): AdminActor => ({
  *   schemas:
  *     AuditLog:
  *       type: object
+ *       description: One line of the Audit Logs table, ready to display
  *       properties:
  *         id: { type: integer, example: 1042 }
  *         createdAt: { type: string, format: date-time }
- *         result: { type: string, enum: [success, failure, blocked] }
- *         status: { type: string, description: The original log message, example: "student_deleted" }
- *         actorType: { type: string, enum: [admin, student, guardian, anonymous, system], description: Who performed the action }
- *         action: { type: string, description: Fixed action code, example: student.deleted }
- *         targetType: { type: string, nullable: true, description: What the action was performed on, example: student }
- *         targetId: { type: string, nullable: true, example: "10" }
- *         userAgent: { type: string, nullable: true }
- *         httpMethod: { type: string, nullable: true, example: DELETE }
- *         path: { type: string, nullable: true, example: "/api/v1/admin/students/:studentId" }
- *         requestId: { type: string, nullable: true }
- *         metadata: { type: object, nullable: true, description: Extra details such as a reason or status code }
- *         ipAddress: { type: string, nullable: true }
- *         businessId: { type: integer, nullable: true }
- *         userId: { type: string, format: uuid, nullable: true, description: The administrator involved }
- *         studentId: { type: integer, nullable: true }
- *         guardianId: { type: integer, nullable: true }
- *         user:
+ *         actor:
+ *           type: object
+ *           description: Actor / User column
+ *           properties:
+ *             type: { type: string, enum: [admin, student, guardian, anonymous, system] }
+ *             id: { type: string, nullable: true, description: uuid for an administrator, numeric id for a student or guardian }
+ *             name: { type: string, example: Jane Smith, description: "\"Unknown (102.89.1.4)\" for a sign-in to no account" }
+ *             role: { type: string, nullable: true, example: Finance Manager, description: The administrator's role(s) in this business; Student or Guardian otherwise }
+ *         action:
+ *           type: object
+ *           description: Action Performed badge
+ *           properties:
+ *             code: { type: string, example: role.created, description: Fixed code, usable as the action filter }
+ *             label: { type: string, example: Created Role }
+ *         target:
  *           type: object
  *           nullable: true
- *           properties: { id: { type: string }, firstName: { type: string }, lastName: { type: string }, email: { type: string } }
- *         students:
+ *           description: Shown after the arrow
+ *           properties:
+ *             type: { type: string, example: role, description: "student, guardian, admin, role, subclass, or an area such as system, wallet, request" }
+ *             id: { type: string, nullable: true, example: "7" }
+ *             name: { type: string, example: Finance Manager, description: "A person or record name, or System / Student Portal / Guardian Portal for sign-ins" }
+ *         status: { type: string, enum: [success, failed, blocked] }
+ *         statusLabel: { type: string, enum: [Success, Failed, Blocked] }
+ *         details:
  *           type: object
- *           nullable: true
- *           properties: { id: { type: integer }, firstName: { type: string }, lastName: { type: string }, registrationNumber: { type: string } }
- *         guardians:
- *           type: object
- *           nullable: true
- *           properties: { id: { type: integer }, firstName: { type: string }, lastName: { type: string } }
+ *           description: Extra information for a detail view
+ *           properties:
+ *             description: { type: string, nullable: true, description: The original log message }
+ *             ipAddress: { type: string, nullable: true }
+ *             userAgent: { type: string, nullable: true }
+ *             httpMethod: { type: string, nullable: true, example: DELETE }
+ *             path: { type: string, nullable: true, example: "/api/v1/admin/students/:studentId" }
+ *             requestId: { type: string, nullable: true }
+ *             metadata: { type: object, nullable: true }
  */
 
 /**
@@ -82,6 +90,7 @@ const getActor = (req: Request): AdminActor => ({
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
  *       - { in: query, name: actorType, schema: { type: string, enum: [admin, student, guardian, anonymous, system] }, description: Only rows where this kind of account acted }
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 }, description: "The search box: matches the actor's or the target's name" }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: student.blocked }
  *       - { in: query, name: from, schema: { type: string, format: date-time } }
@@ -128,9 +137,11 @@ export const listAuditLogsHandler = async (
  *   get:
  *     summary: View administrators' audit logs
  *     description: |
- *       Returns what administrators in your business did, newest first. Pass userId
- *       for one administrator; leave it out for every administrator. Returns an
- *       empty list if the administrator is not in your business.
+ *       The Admin Logs tab. Returns what administrators in your business did, newest
+ *       first, except actions on a student or guardian, which the Student and
+ *       Guardian tabs show (GET /audit-logs?actorType=admin returns both). Pass
+ *       userId for one administrator; leave it out for every administrator.
+ *       Returns an empty list if the administrator is not in your business.
  *       Requires admin.audit_logs.view_all.
  *     tags:
  *       - Audit Logs
@@ -140,6 +151,7 @@ export const listAuditLogsHandler = async (
  *       - { in: query, name: userId, schema: { type: string, format: uuid }, description: One administrator. Omit for all administrators }
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 }, description: "The search box: matches the actor's or the target's name" }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
  *       - { in: query, name: from, schema: { type: string, format: date-time }, description: "On or after this time. A date such as 2026-11-01 starts at midnight UTC" }
@@ -167,10 +179,10 @@ export const listAuditLogsHandler = async (
  *   get:
  *     summary: View students' audit logs
  *     description: |
- *       Returns what students in your business did, such as logins and password
- *       changes, newest first. Pass studentId for one student; leave it out for every
- *       student. Add include=received to also see what administrators and guardians
- *       did to the student(s) (created, updated, blocked, ...).
+ *       The Student Logs tab. Returns what students in your business did (logins,
+ *       password changes, ...) and what administrators and guardians did to them
+ *       (created, updated, blocked, ...), newest first. Pass studentId for one
+ *       student; leave it out for every student. scope=own leaves out what others did.
  *       Requires admin.audit_logs.view_all.
  *     tags:
  *       - Audit Logs
@@ -178,9 +190,10 @@ export const listAuditLogsHandler = async (
  *       - bearerAuth: []
  *     parameters:
  *       - { in: query, name: studentId, schema: { type: integer }, description: One student. Omit for all students }
- *       - { in: query, name: include, schema: { type: string, enum: [received] }, description: Also return what others did to the student(s) }
+ *       - { in: query, name: scope, schema: { type: string, enum: [all, own], default: all }, description: "all: what the student(s) did plus what others did to them. own: only what they did" }
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 }, description: "The search box: matches the actor's or the target's name" }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
  *       - { in: query, name: from, schema: { type: string, format: date-time }, description: "On or after this time. A date such as 2026-11-01 starts at midnight UTC" }
@@ -208,9 +221,9 @@ export const listAuditLogsHandler = async (
  *   get:
  *     summary: View guardians' audit logs
  *     description: |
- *       Returns what guardians in your business did, newest first. Pass guardianId
- *       for one guardian; leave it out for every guardian. Add include=received to
- *       also see what administrators did to the guardian(s).
+ *       The Guardian Logs tab. Returns what guardians in your business did and what
+ *       administrators did to them, newest first. Pass guardianId for one guardian;
+ *       leave it out for every guardian. scope=own leaves out what others did.
  *       Requires admin.audit_logs.view_all.
  *     tags:
  *       - Audit Logs
@@ -218,9 +231,10 @@ export const listAuditLogsHandler = async (
  *       - bearerAuth: []
  *     parameters:
  *       - { in: query, name: guardianId, schema: { type: integer }, description: One guardian. Omit for all guardians }
- *       - { in: query, name: include, schema: { type: string, enum: [received] }, description: Also return what administrators did to the guardian(s) }
+ *       - { in: query, name: scope, schema: { type: string, enum: [all, own], default: all }, description: "all: what the guardian(s) did plus what administrators did to them. own: only what they did" }
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 }, description: "The search box: matches the actor's or the target's name" }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
  *       - { in: query, name: from, schema: { type: string, format: date-time }, description: "On or after this time. A date such as 2026-11-01 starts at midnight UTC" }
@@ -292,6 +306,7 @@ export const listGuardiansAuditLogsHandler = async (
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 }, description: "The search box: matches the actor's or the target's name" }
  *       - { in: query, name: result, schema: { type: string, enum: [success, failure, blocked] } }
  *       - { in: query, name: action, schema: { type: string }, description: An exact action code, or a whole area such as auth.*, example: auth.login_failed }
  *       - { in: query, name: from, schema: { type: string, format: date-time } }
